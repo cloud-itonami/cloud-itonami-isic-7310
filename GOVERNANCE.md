@@ -1,6 +1,6 @@
 # Governance
 
-`cloud-itonami-7310` is an OSS open-business blueprint for advertising -- creating and placing advertising campaigns for clients across media.
+`cloud-itonami-isic-7310` is an OSS open-business blueprint for advertising -- creating and placing advertising campaigns for clients across media.
 Governance covers both the capability layer and the operator model.
 
 ## Maintainers

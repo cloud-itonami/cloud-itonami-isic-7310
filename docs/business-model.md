@@ -2,7 +2,7 @@
 
 ## Classification
 
-- Repository: `cloud-itonami-7310`
+- Repository: `cloud-itonami-isic-7310`
 - ISIC Rev.5: `7310`
 - Activity: advertising -- creating and placing advertising campaigns for clients across media
 - Social impact: professional standards, data sovereignty, transparent audit

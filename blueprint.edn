@@ -1,4 +1,4 @@
-{:itonami.blueprint/id "cloud-itonami-7310"
+{:itonami.blueprint/id "cloud-itonami-isic-7310"
  :itonami.blueprint/name "Advertising"
  :itonami.blueprint/isic-rev5 "7310"
  :itonami.blueprint/domain :professional/advertising

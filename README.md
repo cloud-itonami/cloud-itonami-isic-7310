@@ -1,4 +1,4 @@
-# cloud-itonami-7310
+# cloud-itonami-isic-7310
 
 Open Business Blueprint for **ISIC Rev.5 7310**: Advertising.
 
