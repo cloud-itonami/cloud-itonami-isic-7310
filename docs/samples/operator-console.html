@@ -1,0 +1,52 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>advertising operator console (generated)</title>
+<style>body{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;padding:2rem;background:#0b0d10;color:#e6e8eb}
+  h1{font-size:1.4rem;margin:0 0 .25rem}
+  h2{font-size:1.05rem;margin:2rem 0 .5rem;color:#9fb3c8}
+  p.lede{color:#9aa4ae;margin:0 0 1.5rem}
+  table{border-collapse:collapse;width:100%;margin-bottom:1rem;font-size:.85rem}
+  th,td{border:1px solid #2a2f36;padding:.4rem .6rem;text-align:left;vertical-align:top}
+  th{background:#161a1f;color:#9fb3c8;font-weight:600}
+  tr:nth-child(even) td{background:#101317}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.82em}
+  .ok{color:#5fd68a}
+  .warn{color:#e8c46b}
+  .err{color:#e8756b}
+  .critical{color:#ff5c5c;font-weight:700}
+  .muted{color:#6b7480}
+  footer{margin-top:2rem;color:#6b7480;font-size:.8rem}</style></head><body>
+<h1>cloud-itonami-isic-7310 -- Advertising Operator Console</h1>
+<p class="lede">Generated at build time by <code>advertising.render-html</code>, driving the real <code>advertising.operation</code> StateGraph (intake -&gt; advise -&gt; govern -&gt; decide -&gt; request-approval -&gt; commit/hold) against <code>advertising.store/seed-db</code>. No hand-typed numbers.</p>
+<h2>Campaign directory (post-scenario)</h2>
+<table><thead><tr><th>id</th><th>client</th><th>jurisdiction</th><th>proposed media spend</th><th>authorized budget</th><th>misleading-claim risk</th><th>placement</th><th>latest ledger status</th></tr></thead><tbody>
+<tr><td><code>campaign-1</code></td><td>Sato Bakery</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="ok">placed (JPN-PLC-000000)</td><td class="err">governor-hold: already-placed</td></tr>
+<tr><td><code>campaign-2</code></td><td>Atlantis Goods</td><td>ATL</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: no-spec-basis</td></tr>
+<tr><td><code>campaign-3</code></td><td>鈴木工務店</td><td>JPN</td><td>900000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: media-spend-exceeds-authorized-budget</td></tr>
+<tr><td><code>campaign-4</code></td><td>田中青果</td><td>JPN</td><td>500000</td><td>800000</td><td class="err">unresolved</td><td class="muted">not placed</td><td class="err">governor-hold: misleading-claim-risk-unresolved</td></tr>
+</tbody></table>
+<h2>Action gate (advertising.phase x advertising.governor/high-stakes)</h2>
+<table><thead><tr><th>phase</th><th>label</th><th>writes allowed</th><th>auto-commit eligible (governor-clean)</th><th>always-escalate (high-stakes)</th></tr></thead><tbody>
+<tr><td>0</td><td>read-only</td><td><span class="muted">none</span></td><td><span class="muted">none -- human approval required</span></td><td>place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
+<tr><td>1</td><td>assisted-intake</td><td>intake</td><td><span class="muted">none -- human approval required</span></td><td>place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
+<tr><td>2</td><td>assisted-verify</td><td>intake, screen, verify</td><td><span class="muted">none -- human approval required</span></td><td>place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
+<tr><td>3</td><td>supervised-auto</td><td>intake, place-campaign, screen, verify</td><td>intake</td><td>place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
+</tbody></table>
+<h2>Audit ledger (append-only, advertising.store/ledger)</h2>
+<table><thead><tr><th>#</th><th>op</th><th>subject</th><th>actor</th><th>disposition</th><th>basis / hold rules</th><th>confidence</th></tr></thead><tbody>
+<tr><td>1</td><td><code>intake</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>id, client-name</td><td><span class="muted">--</span></td></tr>
+<tr><td>2</td><td><code>verify</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>不当景品類及び不当表示防止法 (Act against Unjustifiable Premiums and Misleading Representations, 景品表示法), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
+<tr><td>3</td><td><code>screen</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>misleading-claim-check</td><td><span class="muted">--</span></td></tr>
+<tr><td>4</td><td><code>place-campaign</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>campaign-1</td><td><span class="muted">--</span></td></tr>
+<tr><td>5</td><td><code>verify</code></td><td><code>campaign-2</code></td><td>op-1</td><td class="err">hold</td><td>no-spec-basis</td><td>0.9</td></tr>
+<tr><td>6</td><td><code>verify</code></td><td><code>campaign-3</code></td><td>op-1</td><td class="ok">commit</td><td>不当景品類及び不当表示防止法 (Act against Unjustifiable Premiums and Misleading Representations, 景品表示法), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
+<tr><td>7</td><td><code>place-campaign</code></td><td><code>campaign-3</code></td><td>op-1</td><td class="err">hold</td><td>media-spend-exceeds-authorized-budget</td><td>0.3</td></tr>
+<tr><td>8</td><td><code>screen</code></td><td><code>campaign-4</code></td><td>op-1</td><td class="err">hold</td><td>misleading-claim-risk-unresolved</td><td>0.95</td></tr>
+<tr><td>9</td><td><code>place-campaign</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="err">hold</td><td>already-placed</td><td>0.9</td></tr>
+</tbody></table>
+<h2>Draft campaign-placement records (advertising.registry, unsigned)</h2>
+<table><thead><tr><th>record_id</th><th>campaign_id</th><th>jurisdiction</th><th>kind</th></tr></thead><tbody>
+<tr><td><code>JPN-PLC-000000</code></td><td><code>campaign-1</code></td><td>JPN</td><td>campaign-placement-draft</td></tr>
+</tbody></table>
+<footer>Source: <code>src/advertising/render_html.clj</code> via <code>clojure -M:dev:render-html</code>. Nightly regeneration: <code>.github/workflows/regenerate.yml</code>.</footer>
+</body></html>
