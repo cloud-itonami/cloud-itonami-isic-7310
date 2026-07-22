@@ -32,10 +32,9 @@
   query over an immutable log -- the audit trail a client trusting an
   agency needs, and the evidence an agency needs if a placement
   decision is later disputed."
-  (:require #?(:clj  [clojure.edn :as edn]
-               :cljs [cljs.reader :as edn])
-            [advertising.registry :as registry]
-            [langchain.db :as d]))
+  (:require [advertising.registry :as registry]
+            [langchain.db :as d]
+            [langchain-store.core :as ls]))
 
 (defprotocol Store
   (campaign [s id])
@@ -145,16 +144,13 @@
   Compound values (media-plan/risk-screen payloads, ledger facts,
   placement records) are stored as EDN strings so `langchain.db`
   doesn't expand them into sub-entities -- the same convention every
-  sibling actor's store uses."
-  {:campaign/id                        {:db/unique :db.unique/identity}
-   :media-plan/campaign-id             {:db/unique :db.unique/identity}
-   :risk-screen/campaign-id            {:db/unique :db.unique/identity}
-   :ledger/seq                        {:db/unique :db.unique/identity}
-   :placement/seq                     {:db/unique :db.unique/identity}
-   :placement-sequence/jurisdiction   {:db/unique :db.unique/identity}})
-
-(defn- enc [v] (pr-str v))
-(defn- dec* [s] (when s (edn/read-string s)))
+  sibling actor's store uses. The identity-schema builder, EDN-blob
+  codec and seq-keyed event-log read/append are the shared
+  kotoba-lang/langchain-store machinery (ADR-2607141600) -- the seam
+  ~190 actors hand-roll; this store keeps only its domain wiring."
+  (ls/identity-schema
+   [:campaign/id :media-plan/campaign-id :risk-screen/campaign-id
+    :ledger/seq :placement/seq :placement-sequence/jurisdiction]))
 
 (defn- campaign->tx [{:keys [id client-name proposed-media-spend authorized-budget
                             misleading-claim-risk-unresolved?
@@ -194,21 +190,15 @@
          (map #(pull->campaign (d/pull (d/db conn) campaign-pull [:campaign/id %])))
          (sort-by :id)))
   (risk-screen-of [_ id]
-    (dec* (d/q '[:find ?p . :in $ ?cid
+    (ls/dec* (d/q '[:find ?p . :in $ ?cid
                 :where [?k :risk-screen/campaign-id ?cid] [?k :risk-screen/payload ?p]]
               (d/db conn) id)))
   (media-plan-of [_ campaign-id]
-    (dec* (d/q '[:find ?p . :in $ ?cid
+    (ls/dec* (d/q '[:find ?p . :in $ ?cid
                 :where [?a :media-plan/campaign-id ?cid] [?a :media-plan/payload ?p]]
               (d/db conn) campaign-id)))
-  (ledger [_]
-    (->> (d/q '[:find ?s ?f :where [?e :ledger/seq ?s] [?e :ledger/fact ?f]] (d/db conn))
-         (sort-by first)
-         (mapv (comp dec* second))))
-  (placement-history [_]
-    (->> (d/q '[:find ?s ?r :where [?e :placement/seq ?s] [?e :placement/record ?r]] (d/db conn))
-         (sort-by first)
-         (mapv (comp dec* second))))
+  (ledger [_] (ls/read-stream conn :ledger/seq :ledger/fact))
+  (placement-history [_] (ls/read-stream conn :placement/seq :placement/record))
   (next-placement-sequence [_ jurisdiction]
     (or (d/q '[:find ?n . :in $ ?j
               :where [?e :placement-sequence/jurisdiction ?j] [?e :placement-sequence/next ?n]]
@@ -222,10 +212,10 @@
       (d/transact! conn [(campaign->tx value)])
 
       :media-plan/set
-      (d/transact! conn [{:media-plan/campaign-id (first path) :media-plan/payload (enc payload)}])
+      (d/transact! conn [{:media-plan/campaign-id (first path) :media-plan/payload (ls/enc payload)}])
 
       :risk-screen/set
-      (d/transact! conn [{:risk-screen/campaign-id (first path) :risk-screen/payload (enc payload)}])
+      (d/transact! conn [{:risk-screen/campaign-id (first path) :risk-screen/payload (ls/enc payload)}])
 
       :campaign/mark-placed
       (let [campaign-id (first path)
@@ -235,12 +225,12 @@
         (d/transact! conn
                      [(campaign->tx (assoc campaign-patch :id campaign-id))
                       {:placement-sequence/jurisdiction jurisdiction :placement-sequence/next next-n}
-                      {:placement/seq (count (placement-history s)) :placement/record (enc (get result "record"))}])
+                      {:placement/seq (count (placement-history s)) :placement/record (ls/enc (get result "record"))}])
         result)
       nil)
     s)
   (append-ledger! [s fact]
-    (d/transact! conn [{:ledger/seq (count (ledger s)) :ledger/fact (enc fact)}])
+    (d/transact! conn [{:ledger/seq (count (ledger s)) :ledger/fact (ls/enc fact)}])
     fact)
   (with-campaigns [s campaigns]
     (when (seq campaigns) (d/transact! conn (mapv campaign->tx (vals campaigns)))) s))
