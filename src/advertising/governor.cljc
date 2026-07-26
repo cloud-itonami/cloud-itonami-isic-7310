@@ -95,6 +95,21 @@
                                        campaign` (a REAL client-facing
                                        act) -> escalate.
 
+  A SECOND family of HARD checks censors the same proposals against
+  the MEDIA PLATFORM's own published ad policy (`advertising.
+  platform`, ADR-0002) rather than against a jurisdiction's law:
+  `no-platform-policy-basis`, `platform-check-incomplete`,
+  `platform-prohibited-category`, `platform-restricted-category-
+  unapproved`, `platform-attestation-missing` and `sensitive-
+  placement-context`. The two families are independent authorities and
+  neither subsumes the other -- a campaign can be perfectly lawful
+  under 景表法/the FTC Act and still be categorically disallowed on the
+  platform it was bought on, and vice versa -- so BOTH run on every
+  `:actuation/place-campaign`. Like the jurisdiction checks these are
+  computed from the campaign's OWN permanent fields against a
+  transcribed policy, so they need no proposal inspection and a human
+  approver cannot override them.
+
   One more guard, double-placement prevention, is enforced but NOT
   listed as a numbered HARD check above because it needs no upstream
   comparison at all -- `already-placed-violations` refuses to place a
@@ -104,10 +119,22 @@
   governor's guards establish, informed by `cloud-itonami-isic-6492`'s
   status-lifecycle bug (ADR-2607071320)."
   (:require [advertising.facts :as facts]
+            [advertising.platform :as platform]
             [advertising.registry :as registry]
             [advertising.store :as store]))
 
 (def confidence-floor 0.6)
+
+(def ^:private platform-gated-ops
+  "Ops whose proposals are censored against the target media
+  platform's own published ad policy (`advertising.platform`).
+
+  `:platform/verify` is included so the platform-conformance op HARD-
+  holds on its OWN finding rather than writing a clean assessment that
+  a later `:actuation/place-campaign` would then read as evidence --
+  the same 'the screening op can hold on what it just found'
+  discipline `misleading-claim-risk-unresolved-violations` uses."
+  #{:platform/verify :actuation/place-campaign})
 
 (def high-stakes
   "Stakes grave enough to always require a human, even when clean.
@@ -180,6 +207,128 @@
       [{:rule :misleading-claim-risk-unresolved
         :detail "未解決の誤認表示リスクがあるキャンペーンの出稿提案は進められない"}])))
 
+;; ------------------- media-platform checks (ADR-0002) -------------------
+;;
+;; The jurisdiction checks above answer 'is this campaign lawful where
+;; it runs?'. These answer 'does the MEDIA PLATFORM it is bought on
+;; actually allow it?' -- a separate authority with its own published
+;; policy, its own category taxonomy, and (on a generative surface) a
+;; failure mode print/search advertising does not have. A campaign can
+;; be fully lawful and still be a policy violation on the platform, so
+;; neither family subsumes the other; both run.
+
+(defn- target-platform
+  "The campaign's own target platform id, or nil."
+  [st subject]
+  (:target-platform (store/campaign st subject)))
+
+(defn- platform-policy-basis-violations
+  "A campaign targeting a platform with NO transcribed policy in
+  `advertising.platform` is a HARD violation -- the exact platform-side
+  analog of `spec-basis-violations`. An unknown platform is not a
+  permissive default: the actor has no idea what that platform allows,
+  so it must not place there."
+  [{:keys [op subject]} st]
+  (when (contains? platform-gated-ops op)
+    (let [pid (target-platform st subject)]
+      (when (nil? (platform/policy-basis pid))
+        [{:rule :no-platform-policy-basis
+          :detail (str "媒体 " (pr-str pid)
+                       " の公式広告ポリシーが advertising.platform に未登録"
+                       " — 未登録媒体への出稿は許可しない(要件を推測で作らない)")}]))))
+
+(defn- platform-check-incomplete-violations
+  "For `:actuation/place-campaign`, the campaign must actually have a
+  committed platform-conformance assessment on file -- the platform-
+  side analog of `evidence-incomplete-violations`. Clearing the
+  jurisdiction's evidence checklist says nothing about whether the
+  platform allows the ad."
+  [{:keys [op subject]} st]
+  (when (= op :actuation/place-campaign)
+    (when-not (store/platform-check-of st subject)
+      [{:rule :platform-check-incomplete
+        :detail "媒体側広告ポリシー適合性評価(:platform/verify)が未実施の状態での出稿提案"}])))
+
+(defn- platform-prohibited-category-violations
+  "The campaign's own declared ad category is one the platform's own
+  policy refuses -- either named as prohibited, or unnamed under a
+  CLOSED category set (a platform that says 'every category we have
+  not listed is disallowed'). Computed from the campaign's own
+  permanent field against the transcribed policy; needs no proposal
+  inspection."
+  [{:keys [op subject]} st]
+  (when (contains? platform-gated-ops op)
+    (let [c (store/campaign st subject)
+          pid (:target-platform c)
+          disp (platform/category-disposition pid (:ad-category c))]
+      (when (contains? #{:prohibited :not-permitted} disp)
+        [{:rule :platform-prohibited-category
+          :detail (str "広告カテゴリ " (pr-str (:ad-category c))
+                       " は媒体 " (pr-str pid) " のポリシー上 "
+                       (if (= disp :prohibited)
+                         "明示的に禁止"
+                         "未掲載(当該媒体は未掲載カテゴリを一律不許可と宣言)"))}]))))
+
+(defn- platform-restricted-category-unapproved-violations
+  "The category is servable on this platform ONLY for a pre-approved
+  advertiser, and only in the jurisdictions the platform allows it in.
+  Either condition unmet is a HARD hold -- 'restricted' is not 'allowed
+  with a note in the file'."
+  [{:keys [op subject]} st]
+  (when (contains? platform-gated-ops op)
+    (let [c (store/campaign st subject)
+          pid (:target-platform c)]
+      (when (= :restricted (platform/category-disposition pid (:ad-category c)))
+        (let [approved? (true? (:advertiser-approval-on-file? c))
+              juris-ok? (platform/restricted-category-allowed-jurisdiction? pid (:jurisdiction c))]
+          (when-not (and approved? juris-ok?)
+            [{:rule :platform-restricted-category-unapproved
+              :detail (str "制限カテゴリ " (pr-str (:ad-category c)) " / 媒体 " (pr-str pid)
+                           (when-not approved? " — 広告主事前承認が未取得")
+                           (when-not juris-ok?
+                             (str " — 法域 " (pr-str (:jurisdiction c))
+                                  " は当該媒体の制限カテゴリ許可法域外")))}]))))))
+
+(defn- platform-attestation-missing-violations
+  "The platform requires the agency to positively ASSERT certain facts
+  before a placement (`:required-attestations`). Absence is never
+  consent: a campaign that simply omits the field has not attested it.
+
+  On a GENERATIVE surface the load-bearing member is
+  `:distinguishable-from-product-ui`. ChatGPT's ad policy makes
+  interface mimicry (`インターフェースの模倣`) a standalone
+  prohibition -- an ad styled like the assistant's own answer is not a
+  cosmetic problem there, it is the ad ceasing to be identifiable as
+  an ad, which is the thing truth-in-advertising law is about. That is
+  why `advertising.platform` records `:generative-surface?` as a fact
+  and why this check is HARD rather than a creative-review nicety."
+  [{:keys [op subject]} st]
+  (when (contains? platform-gated-ops op)
+    (let [c (store/campaign st subject)
+          pid (:target-platform c)
+          missing (platform/missing-attestations pid (:attestations c))]
+      (when (seq missing)
+        [{:rule :platform-attestation-missing
+          :detail (str "媒体 " (pr-str pid) " の必須表明が未取得: " (pr-str missing)
+                       (when (platform/generative-surface? pid)
+                         " (生成面のため広告と生成応答の識別可能性が必須)"))}]))))
+
+(defn- sensitive-placement-context-violations
+  "The campaign asks to be placed against a conversation/page context
+  the platform's own placement policy refuses to serve ads near
+  (suicide/self-harm, mental-health conversations, emotionally
+  reliant interactions, political content, ...). Computed off the
+  campaign's own requested contexts against the transcribed policy."
+  [{:keys [op subject]} st]
+  (when (contains? platform-gated-ops op)
+    (let [c (store/campaign st subject)
+          pid (:target-platform c)
+          hits (platform/excluded-context-hits pid (:requested-placement-contexts c))]
+      (when (seq hits)
+        [{:rule :sensitive-placement-context
+          :detail (str "媒体 " (pr-str pid) " が広告掲載を認めないコンテキストへの出稿要求: "
+                       (pr-str hits))}]))))
+
 (defn- already-placed-violations
   "For `:actuation/place-campaign`, refuses to place the SAME campaign
   twice, off a dedicated `:campaign-placed?` fact (never a `:status`
@@ -200,7 +349,14 @@
                            (evidence-incomplete-violations request st)
                            (media-spend-exceeds-authorized-budget-violations request st)
                            (misleading-claim-risk-unresolved-violations request proposal st)
-                           (already-placed-violations request st)))
+                           (already-placed-violations request st)
+                           ;; media-platform side (ADR-0002)
+                           (platform-policy-basis-violations request st)
+                           (platform-check-incomplete-violations request st)
+                           (platform-prohibited-category-violations request st)
+                           (platform-restricted-category-unapproved-violations request st)
+                           (platform-attestation-missing-violations request st)
+                           (sensitive-placement-context-violations request st)))
         conf (:confidence proposal 0.0)
         low? (< conf confidence-floor)
         stakes? (boolean (high-stakes (:stake proposal)))

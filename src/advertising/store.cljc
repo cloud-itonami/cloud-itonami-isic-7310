@@ -41,6 +41,7 @@
   (all-campaigns [s])
   (risk-screen-of [s campaign-id] "committed misleading-claim-risk screening verdict for a campaign, or nil")
   (media-plan-of [s campaign-id] "committed media-plan evidence assessment, or nil")
+  (platform-check-of [s campaign-id] "committed media-platform ad-policy conformance assessment, or nil")
   (ledger [s])
   (placement-history [s] "the append-only campaign-placement history (advertising.registry drafts)")
   (next-placement-sequence [s jurisdiction] "next placement-number sequence for a jurisdiction")
@@ -51,31 +52,96 @@
 
 ;; ----------------------------- demo data -----------------------------
 
+(def ^:private clean-platform-facts
+  "The media-platform facts a campaign needs to clear every platform-
+  side governor check on `chatgpt-ads`. Spelled out once so the demo
+  campaigns that exercise OTHER failure modes are not accidentally
+  also platform-dirty -- each demo campaign should fail for exactly
+  the one reason it exists to demonstrate."
+  {:target-platform "chatgpt-ads"
+   :ad-category :local-services
+   :advertiser-approval-on-file? false
+   :attestations {:distinguishable-from-product-ui true
+                  :landing-page-consistency true
+                  :advertiser-identity-verified true}
+   :requested-placement-contexts []})
+
 (defn demo-data
   "A small, self-contained campaign set covering the actuation
-  lifecycle (placing a campaign) so the actor + tests run offline."
+  lifecycle (placing a campaign) so the actor + tests run offline.
+  campaign-1..4 exercise the jurisdiction-side governor checks;
+  campaign-5..9 exercise the media-platform-side ones."
   []
   {:campaigns
-   {"campaign-1" {:id "campaign-1" :client-name "Sato Bakery"
+   {"campaign-1" (merge clean-platform-facts
+                 {:id "campaign-1" :client-name "Sato Bakery"
                  :proposed-media-spend 500000 :authorized-budget 800000
                  :misleading-claim-risk-unresolved? false
                  :campaign-placed? false
-                 :jurisdiction "JPN" :status :intake}
-    "campaign-2" {:id "campaign-2" :client-name "Atlantis Goods"
+                 :jurisdiction "JPN" :status :intake})
+    "campaign-2" (merge clean-platform-facts
+                 {:id "campaign-2" :client-name "Atlantis Goods"
                  :proposed-media-spend 500000 :authorized-budget 800000
                  :misleading-claim-risk-unresolved? false
                  :campaign-placed? false
-                 :jurisdiction "ATL" :status :intake}
-    "campaign-3" {:id "campaign-3" :client-name "鈴木工務店"
+                 :jurisdiction "ATL" :status :intake})
+    "campaign-3" (merge clean-platform-facts
+                 {:id "campaign-3" :client-name "鈴木工務店"
                  :proposed-media-spend 900000 :authorized-budget 800000
                  :misleading-claim-risk-unresolved? false
                  :campaign-placed? false
-                 :jurisdiction "JPN" :status :intake}
-    "campaign-4" {:id "campaign-4" :client-name "田中青果"
+                 :jurisdiction "JPN" :status :intake})
+    "campaign-4" (merge clean-platform-facts
+                 {:id "campaign-4" :client-name "田中青果"
                  :proposed-media-spend 500000 :authorized-budget 800000
                  :misleading-claim-risk-unresolved? true
                  :campaign-placed? false
-                 :jurisdiction "JPN" :status :intake}}})
+                 :jurisdiction "JPN" :status :intake})
+    ;; -- media-platform failure modes --
+    ;; an ad network with no transcribed policy in advertising.platform
+    "campaign-5" (merge clean-platform-facts
+                 {:id "campaign-5" :client-name "Kaneko Tools"
+                 :target-platform "acme-adnet"
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+    ;; a category the platform's own policy names as prohibited
+    "campaign-6" (merge clean-platform-facts
+                 {:id "campaign-6" :client-name "Lucky Palace"
+                 :ad-category :gambling
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+    ;; a restricted category, unapproved advertiser AND outside the
+    ;; platform's restricted-category jurisdiction set
+    "campaign-7" (merge clean-platform-facts
+                 {:id "campaign-7" :client-name "Marunouchi Lending"
+                 :ad-category :financial-services
+                 :advertiser-approval-on-file? false
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+    ;; a generative surface with the interface-mimicry attestation absent
+    "campaign-8" (merge clean-platform-facts
+                 {:id "campaign-8" :client-name "Yamada Travel"
+                 :ad-category :travel-experiences
+                 :attestations {:landing-page-consistency true
+                                :advertiser-identity-verified true}
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+    ;; placement requested against a context the platform excludes
+    "campaign-9" (merge clean-platform-facts
+                 {:id "campaign-9" :client-name "Aoi Clinic Supplies"
+                 :requested-placement-contexts [:mental-and-personal-health]
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})}})
 
 ;; ----------------------------- shared commit logic -----------------------------
 
@@ -86,7 +152,8 @@
   [s campaign-id]
   (let [c (campaign s campaign-id)
         seq-n (next-placement-sequence s (:jurisdiction c))
-        result (registry/register-campaign-placement campaign-id (:jurisdiction c) seq-n)]
+        result (registry/register-campaign-placement campaign-id (:jurisdiction c) seq-n
+                                                     (:target-platform c))]
     {:result result
      :campaign-patch {:campaign-placed? true
                      :placement-number (get result "placement_number")}}))
@@ -99,6 +166,7 @@
   (all-campaigns [_] (sort-by :id (vals (:campaigns @a))))
   (risk-screen-of [_ id] (get-in @a [:risk-screens id]))
   (media-plan-of [_ campaign-id] (get-in @a [:media-plans campaign-id]))
+  (platform-check-of [_ campaign-id] (get-in @a [:platform-checks campaign-id]))
   (ledger [_] (:ledger @a))
   (placement-history [_] (:placements @a))
   (next-placement-sequence [_ jurisdiction] (get-in @a [:placement-sequences jurisdiction] 0))
@@ -113,6 +181,9 @@
 
       :risk-screen/set
       (swap! a assoc-in [:risk-screens (first path)] payload)
+
+      :platform-check/set
+      (swap! a assoc-in [:platform-checks (first path)] payload)
 
       :campaign/mark-placed
       (let [campaign-id (first path)
@@ -134,7 +205,8 @@
   default."
   []
   (->MemStore (atom (assoc (demo-data)
-                           :media-plans {} :risk-screens {} :ledger [] :placement-sequences {}
+                           :media-plans {} :risk-screens {} :platform-checks {}
+                           :ledger [] :placement-sequences {}
                            :placements []))))
 
 ;; ----------------------------- DatomicStore (langchain.db) -----------------------------
@@ -150,12 +222,15 @@
   ~190 actors hand-roll; this store keeps only its domain wiring."
   (ls/identity-schema
    [:campaign/id :media-plan/campaign-id :risk-screen/campaign-id
+    :platform-check/campaign-id
     :ledger/seq :placement/seq :placement-sequence/jurisdiction]))
 
 (defn- campaign->tx [{:keys [id client-name proposed-media-spend authorized-budget
                             misleading-claim-risk-unresolved?
                             campaign-placed?
-                            jurisdiction status placement-number]}]
+                            jurisdiction status placement-number
+                            target-platform ad-category advertiser-approval-on-file?
+                            attestations requested-placement-contexts]}]
   (cond-> {:campaign/id id}
     client-name                                   (assoc :campaign/client-name client-name)
     proposed-media-spend                          (assoc :campaign/proposed-media-spend proposed-media-spend)
@@ -164,12 +239,20 @@
     (some? campaign-placed?)                       (assoc :campaign/campaign-placed? campaign-placed?)
     jurisdiction                                    (assoc :campaign/jurisdiction jurisdiction)
     status                                          (assoc :campaign/status status)
-    placement-number                                (assoc :campaign/placement-number placement-number)))
+    placement-number                                (assoc :campaign/placement-number placement-number)
+    target-platform                                 (assoc :campaign/target-platform target-platform)
+    ad-category                                     (assoc :campaign/ad-category ad-category)
+    (some? advertiser-approval-on-file?)            (assoc :campaign/advertiser-approval-on-file? advertiser-approval-on-file?)
+    ;; compound -> EDN blob, so langchain.db doesn't expand them into sub-entities
+    (some? attestations)                            (assoc :campaign/attestations (ls/enc attestations))
+    (some? requested-placement-contexts)            (assoc :campaign/requested-placement-contexts (ls/enc requested-placement-contexts))))
 
 (def ^:private campaign-pull
   [:campaign/id :campaign/client-name :campaign/proposed-media-spend :campaign/authorized-budget
    :campaign/misleading-claim-risk-unresolved? :campaign/campaign-placed?
-   :campaign/jurisdiction :campaign/status :campaign/placement-number])
+   :campaign/jurisdiction :campaign/status :campaign/placement-number
+   :campaign/target-platform :campaign/ad-category :campaign/advertiser-approval-on-file?
+   :campaign/attestations :campaign/requested-placement-contexts])
 
 (defn- pull->campaign [m]
   (when (:campaign/id m)
@@ -179,7 +262,12 @@
      :misleading-claim-risk-unresolved? (boolean (:campaign/misleading-claim-risk-unresolved? m))
      :campaign-placed? (boolean (:campaign/campaign-placed? m))
      :jurisdiction (:campaign/jurisdiction m) :status (:campaign/status m)
-     :placement-number (:campaign/placement-number m)}))
+     :placement-number (:campaign/placement-number m)
+     :target-platform (:campaign/target-platform m)
+     :ad-category (:campaign/ad-category m)
+     :advertiser-approval-on-file? (boolean (:campaign/advertiser-approval-on-file? m))
+     :attestations (or (ls/dec* (:campaign/attestations m)) {})
+     :requested-placement-contexts (or (ls/dec* (:campaign/requested-placement-contexts m)) [])}))
 
 (defrecord DatomicStore [conn]
   Store
@@ -196,6 +284,10 @@
   (media-plan-of [_ campaign-id]
     (ls/dec* (d/q '[:find ?p . :in $ ?cid
                 :where [?a :media-plan/campaign-id ?cid] [?a :media-plan/payload ?p]]
+              (d/db conn) campaign-id)))
+  (platform-check-of [_ campaign-id]
+    (ls/dec* (d/q '[:find ?p . :in $ ?cid
+                :where [?a :platform-check/campaign-id ?cid] [?a :platform-check/payload ?p]]
               (d/db conn) campaign-id)))
   (ledger [_] (ls/read-stream conn :ledger/seq :ledger/fact))
   (placement-history [_] (ls/read-stream conn :placement/seq :placement/record))
@@ -216,6 +308,9 @@
 
       :risk-screen/set
       (d/transact! conn [{:risk-screen/campaign-id (first path) :risk-screen/payload (ls/enc payload)}])
+
+      :platform-check/set
+      (d/transact! conn [{:platform-check/campaign-id (first path) :platform-check/payload (ls/enc payload)}])
 
       :campaign/mark-placed
       (let [campaign-id (first path)

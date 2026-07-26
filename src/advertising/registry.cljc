@@ -66,22 +66,33 @@
   `advertising.governor` independently re-verifies the campaign's own
   authorized-budget ceiling and misleading-claim-risk resolution
   status, and blocks a double-placement for the same campaign, before
-  this is ever allowed to commit."
-  [campaign-id jurisdiction sequence]
-  (when-not (and campaign-id (not= campaign-id ""))
-    (throw (ex-info "campaign-placement: campaign_id required" {})))
-  (when-not (and jurisdiction (not= jurisdiction ""))
-    (throw (ex-info "campaign-placement: jurisdiction required" {})))
-  (when (< sequence 0)
-    (throw (ex-info "campaign-placement: sequence must be >= 0" {})))
-  (let [placement-number (str (str/upper-case jurisdiction) "-PLC-" (zero-pad sequence 6))
-        record {"record_id" placement-number
-                "kind" "campaign-placement-draft"
-                "campaign_id" campaign-id
-                "jurisdiction" jurisdiction
-                "immutable" true}]
-    {"record" record "placement_number" placement-number
-     "certificate" (unsigned-certificate "CampaignPlacement" placement-number placement-number)}))
+  this is ever allowed to commit.
+
+  The 4-arity records WHICH media platform the placement was bought on
+  (ADR-0002). The placement NUMBER stays jurisdiction-scoped: the
+  sequence is the agency's own book-of-record counter, and re-scoping
+  it per platform would silently renumber every placement already
+  drafted. The platform is a field ON the record instead, which is
+  what an auditor reconstructing 'where did this ad actually run?'
+  needs."
+  ([campaign-id jurisdiction sequence]
+   (register-campaign-placement campaign-id jurisdiction sequence nil))
+  ([campaign-id jurisdiction sequence platform]
+   (when-not (and campaign-id (not= campaign-id ""))
+     (throw (ex-info "campaign-placement: campaign_id required" {})))
+   (when-not (and jurisdiction (not= jurisdiction ""))
+     (throw (ex-info "campaign-placement: jurisdiction required" {})))
+   (when (< sequence 0)
+     (throw (ex-info "campaign-placement: sequence must be >= 0" {})))
+   (let [placement-number (str (str/upper-case jurisdiction) "-PLC-" (zero-pad sequence 6))
+         record (cond-> {"record_id" placement-number
+                         "kind" "campaign-placement-draft"
+                         "campaign_id" campaign-id
+                         "jurisdiction" jurisdiction
+                         "immutable" true}
+                  platform (assoc "platform" platform))]
+     {"record" record "placement_number" placement-number
+      "certificate" (unsigned-certificate "CampaignPlacement" placement-number placement-number)})))
 
 (defn append [history result]
   (conj (vec history) (get result "record")))

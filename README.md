@@ -81,8 +81,13 @@ here it is **AdOps-LLM ⊣ Campaign Governor**.
 ## Scope: what this actor does and does not do
 
 This actor covers campaign intake through advertising-standards
-evidence assessment, misleading-claim-risk screening and campaign
-placement. It does **not**, by itself, hold any professional license
+evidence assessment, media-platform ad-policy conformance,
+misleading-claim-risk screening and campaign placement. It does
+**not** integrate with any real ad platform's buying API -- it governs
+the DECISION to place a campaign, not the mechanics of placing it, so
+`:actuation/place-campaign` drafts a placement RECORD an agency would
+keep rather than calling a media network. It does **not**, by itself,
+hold any professional license
 required to operate as an advertising agency in a given jurisdiction,
 and it does not claim to. It also does **not** create the creative
 work itself, or judge the artistic/strategic merit of a campaign --
@@ -120,34 +125,55 @@ record), matching this fleet's majority actuation shape (`3600`/
 ## The core contract
 
 ```
-campaign intake + jurisdiction facts (advertising.facts, spec-cited)
+campaign intake
+   + jurisdiction facts (advertising.facts,   spec-cited)
+   + media-platform facts (advertising.platform, policy-cited)
         |
         v
-   ┌──────────────┐   proposal      ┌───────────────────────┐
-   │ AdOps-LLM    │ ─────────────▶ │ Campaign Governor:            │  (independent system)
-   │ (sealed)     │  + citations    │ spec-basis · evidence-       │
-   └──────────────┘                 │ incomplete · media-spend-    │
-          │                 commit ◀┼ exceeds-authorized-budget    │
-          │                         │ (ceiling) · misleading-claim- │
-    record + ledger        escalate ┼ risk-unresolved               │
-          │              (ALWAYS for│ (unconditional) ·             │
-          │               :actuation│ already-placed                │
-          │               /place-   └───────────────────────┘
-          ▼               campaign)
-      human approval
+   ┌──────────────┐   proposal    ┌──────────────────────────────────┐
+   │ AdOps-LLM    │ ───────────▶  │ Campaign Governor                │ (independent
+   │ (sealed)     │  + citations  │                                  │  system)
+   └──────────────┘               │ jurisdiction side:               │
+          │               commit ◀┤   spec-basis · evidence-         │
+          │                       │   incomplete · media-spend-      │
+    record + ledger               │   exceeds-authorized-budget      │
+          │                       │   (ceiling) · misleading-claim-  │
+          │             escalate ◀┤   risk-unresolved (uncond.) ·    │
+          │        (ALWAYS for    │   already-placed                 │
+          │         :actuation/   │                                  │
+          │         place-        │ media-platform side (ADR-0002):  │
+          ▼         campaign)     │   no-platform-policy-basis ·     │
+    human approval                │   platform-check-incomplete ·    │
+                                  │   platform-prohibited-category · │
+                                  │   platform-restricted-category-  │
+                                  │   unapproved · platform-         │
+                                  │   attestation-missing ·          │
+                                  │   sensitive-placement-context    │
+                                  └──────────────────────────────────┘
 ```
 
 **The AdOps-LLM never places a campaign the Campaign Governor would
 reject, and never does so without a human sign-off.** Hard violations
 (fabricated regulatory requirements; unsupported evidence; a media
 spend past its own authorized budget; an unresolved misleading-claim
-risk; a double placement) force **hold** and *cannot* be approved
-past; a clean placement proposal still always routes to a human.
+risk; a double placement; a media platform whose ad policy nobody has
+read; an ad category that platform itself refuses; a generative
+surface where ad/answer distinguishability was never attested) force
+**hold** and *cannot* be approved past; a clean placement proposal
+still always routes to a human.
+
+**The two check families are independent authorities and neither
+subsumes the other.** A campaign can be perfectly lawful under 景表法
+or the FTC Act and still be categorically disallowed on the platform
+it was bought on; it can equally satisfy every platform policy and
+still be unlawful where it runs. So both families run on every
+`:actuation/place-campaign`, and clearing one clears nothing about the
+other.
 
 ## Run
 
 ```bash
-clojure -M:dev:run     # walk one clean single-actuation lifecycle + four HARD-hold cases through the actor
+clojure -M:dev:run     # walk one clean single-actuation lifecycle + ten HARD-hold cases through the actor
 clojure -M:dev:test    # governor contract · phase invariants · store parity · registry conformance · facts coverage
 clojure -M:lint        # clj-kondo (errors fail; CI mirrors this)
 ```
@@ -195,12 +221,13 @@ the generic robotics/identity/forms/dmn/bpmn/audit-ledger stack only
 | `src/advertising/store.cljc` | **Store** protocol -- `MemStore` ‖ `DatomicStore` (`langchain.db`) + append-only audit ledger + campaign-placement history. No dynamically-filed sub-record -- the actuation op acts directly on a pre-seeded campaign, and the double-actuation guard checks a dedicated `:campaign-placed?` boolean rather than a `:status` value |
 | `src/advertising/registry.cljc` | Campaign-placement draft records, plus `media-spend-exceeds-authorized-budget?` -- the SEVENTH instance of this fleet's MAXIMUM-ceiling check family (`facility`/`school`/`card`/`recovery`/`care`/`navigator` established the first six) |
 | `src/advertising/facts.cljc` | Per-jurisdiction advertising-standards catalog with an official spec-basis citation per entry, honest coverage reporting |
-| `src/advertising/advertisingadvisor.cljc` | **AdOps-LLM** -- `mock-advisor` ‖ `llm-advisor`; intake/media-plan-verification/misleading-claim-risk-screening/campaign-placement proposals |
-| `src/advertising/governor.cljc` | **Campaign Governor** -- 3 HARD checks (spec-basis · evidence-incomplete · media-spend-exceeds-authorized-budget, pure ground-truth ceiling recompute · misleading-claim-risk-unresolved, unconditional evaluation, the THIRTY-EIGHTH grounding of this discipline, a genuinely new concept grounded in this blueprint's own Trust Control text) + already-placed guard + 1 soft (confidence/actuation gate) |
-| `src/advertising/phase.cljc` | **Phase 0→3** -- read-only → assisted intake → assisted verify → supervised (campaign placement always human; campaign intake is the ONLY auto-eligible op, no direct capital risk) |
+| `src/advertising/platform.cljc` | Per-media-platform ad-policy catalog (ADR-0002) -- category taxonomy, restricted-category jurisdictions, excluded placement contexts, required attestations and `:generative-surface?`, each transcribed from a DIRECT read of the platform's own published policy with the URL, version and read date recorded; honest coverage reporting |
+| `src/advertising/advertisingadvisor.cljc` | **AdOps-LLM** -- `mock-advisor` ‖ `llm-advisor`; intake/media-plan-verification/media-platform-conformance/misleading-claim-risk-screening/campaign-placement proposals |
+| `src/advertising/governor.cljc` | **Campaign Governor** -- 4 jurisdiction-side HARD checks (spec-basis · evidence-incomplete · media-spend-exceeds-authorized-budget, pure ground-truth ceiling recompute · misleading-claim-risk-unresolved, unconditional evaluation, the THIRTY-EIGHTH grounding of this discipline, a genuinely new concept grounded in this blueprint's own Trust Control text) + already-placed guard + 6 media-platform-side HARD checks (ADR-0002) + 1 soft (confidence/actuation gate) |
+| `src/advertising/phase.cljc` | **Phase 0→3** -- read-only → assisted intake → assisted verify (media-plan + media-platform conformance) → supervised (campaign placement always human; campaign intake is the ONLY auto-eligible op, no direct capital risk) |
 | `src/advertising/operation.cljc` | **OperationActor** -- langgraph-clj StateGraph |
 | `src/advertising/sim.cljc` | demo driver |
-| `test/advertising/*_test.clj` | governor contract · phase invariants · store parity · registry conformance · facts coverage |
+| `test/advertising/*_test.clj` | governor contract · phase invariants · store parity · registry conformance · facts coverage · media-platform taxonomy + unknown-platform inertness |
 
 ## Business-process coverage (honest)
 
@@ -213,8 +240,9 @@ placement -- the core governed lifecycle this blueprint's own
 |---|---|
 | Campaign intake + per-jurisdiction advertising-standards checklisting, HARD-gated on an official spec-basis citation (`:campaign/intake`/`:media-plan/verify`) | Real media-network integration, real creative production itself (see `advertising.facts`'s docstring) |
 | Misleading-claim-risk screening, evaluated unconditionally so the screening op itself can HARD-hold on its own finding (`:risk/screen`) | Any creative/strategic judgment itself -- deliberately outside this actor's competence |
-| Campaign placement, HARD-gated on full evidence and the campaign's own authorized-budget ceiling, plus a double-placement guard (`:actuation/place-campaign`) | |
-| Immutable audit ledger for every intake/verification/screening/placement decision | |
+| Media-platform ad-policy conformance against the target platform's OWN published policy -- category taxonomy, restricted-category advertiser approval + jurisdiction limits, excluded placement contexts, required attestations (`:platform/verify`, ADR-0002) | Real ad-platform API integration (bidding, creative upload, delivery reporting) -- this actor governs the DECISION to place, not the mechanics of placing |
+| Campaign placement, HARD-gated on full evidence, the campaign's own authorized-budget ceiling AND the target platform's own policy, plus a double-placement guard (`:actuation/place-campaign`) | |
+| Immutable audit ledger for every intake/verification/conformance/screening/placement decision, recording which media platform each placement ran on | |
 
 Extending coverage is additive: add the next gate (e.g. a creative-
 rights-clearance check) as its own governed op with its own HARD
@@ -233,13 +261,54 @@ additive: one map entry in `advertising.facts/catalog`, citing a real
 official source -- never fabricate a jurisdiction's requirements to
 make coverage look bigger.
 
+## Media-platform coverage (honest)
+
+`advertising.platform/coverage` reports how many requested media
+platforms actually have a transcribed ad policy in `advertising.
+platform/catalog` -- currently **one**: `chatgpt-ads`, transcribed
+from a direct read of the [OpenAI 広告ポリシー](https://openai.com/policies/ad-policies/)
+(the document's own v1.3 / 更新 2026年7月15日) on 2026-07-26.
+
+`google-ads`, `meta-ads` and Microsoft Advertising publish real
+policies at real URLs and are **deliberately absent**. Their policies
+had not been read end-to-end when this catalog was written, so there
+was no honest taxonomy to transcribe, and an invented
+`:prohibited-categories` set is strictly worse than an absent one: an
+absent platform HARD-holds on `no-platform-policy-basis`, while an
+invented one waves campaigns through on made-up rules. Adding a
+platform is additive and cheap — read that platform's own published
+policy, transcribe its taxonomy, record the URL, the version the
+document states for itself, and the date you read it. Never seed a
+platform from memory, from a search-result summary, or by inferring
+one network's taxonomy from another's.
+
+### Why `:generative-surface?` is a first-class fact
+
+On a banner or search surface, "is this an ad?" is answered by layout:
+the ad sits in a slot users have learned to read as an ad. On a
+generative surface the assistant's own prose is the primary content,
+so an ad styled like that prose reads as the assistant's answer.
+ChatGPT's ad policy makes this a standalone prohibition
+(`インターフェースの模倣` — ads must be clearly distinguishable from
+the ChatGPT product experience, and ads mimicking the look, function
+or presentation of an OpenAI interface may be removed or required to
+change), which is the same consumer-protection principle behind the
+FTC's [native-advertising guidance](https://www.ftc.gov/business-guidance/resources/native-advertising-guide-businesses)
+(an ad should be identifiable as an ad). That is why
+`:distinguishable-from-product-ui` is a **required attestation** the
+agency must positively assert — absence is never treated as consent —
+and why an unattested campaign HARD-holds rather than passing
+creative review with a note.
+
 ## Maturity
 
 `:implemented` -- `AdOps-LLM` + `Campaign Governor` run as real,
 tested code (see `Run` above), promoted from the originally-published
 `:blueprint`-tier scaffold, modeled closely on the fifty-three prior
 actors' architecture. See `docs/adr/0001-architecture.md` for the
-history and design.
+history and design, and `docs/adr/0002-media-platform-layer.md` for
+the media-platform layer (`advertising.platform`, `:platform/verify`
+and the six platform-side governor checks).
 
 ## License
 
