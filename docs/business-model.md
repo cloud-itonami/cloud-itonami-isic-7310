@@ -17,6 +17,9 @@
 
 - brief intake
 - creative/media-plan proposal
+- media-platform ad-policy conformance assessment (per-platform category
+  taxonomy, restricted-category approval + jurisdiction limits, excluded
+  placement contexts, required attestations)
 - campaign-placement proposal
 - immutable audit ledger
 
@@ -102,6 +105,17 @@ owner. Until that happens this blueprint has a price but no checkout, and
 - a fabricated jurisdiction citation, incomplete evidence, or a proposed media
   spend exceeding its own authorized budget -- each forces a hold, not an
   override
+- a media platform whose own published ad policy has not been read and
+  transcribed cannot be placed on at all: an unknown platform holds, it does
+  not default to permissive (ADR-0002)
+- an ad category the target platform itself prohibits, a restricted category
+  without both advertiser approval and an allowed jurisdiction, a placement
+  requested against a context the platform refuses to serve ads near, or a
+  generative surface where ad/answer distinguishability was never attested --
+  each forces a hold, not an override
+- lawfulness and platform-policy conformance are checked independently:
+  clearing the jurisdiction side clears nothing about the platform, and vice
+  versa
 - campaign placement is logged and escalated, and cannot be finalized twice
   for the same campaign: a double-placement attempt is held off this actor's
   own campaign facts alone, with no upstream comparison needed
@@ -120,13 +134,25 @@ AdOps-LLM -> Campaign Governor -> hold, proceed, or human approval
 
 **Approves**: routine advertising actions proposed against a campaign
 that already has a consented brief on file, a media spend within its
-own authorized budget, and no unresolved misleading-claim risk. These
-proceed straight to the engagement ledger.
+own authorized budget, no unresolved misleading-claim risk, and a
+target media platform whose own published ad policy has been read,
+transcribed and satisfied. These proceed straight to the engagement
+ledger.
 
 **Rejects or escalates**: the governor refuses to let the advisor
 place a campaign on its own authority when any of the following hold
 -- a fabricated jurisdiction spec-basis; incomplete evidence; a media
 spend exceeding its own authorized budget; an unresolved misleading-
-claim risk. A clean placement proposal still always routes to a human
--- `:actuation/place-campaign` is never auto-committed, at any rollout
-phase.
+claim risk; a target media platform with no transcribed ad policy; a
+missing platform-conformance assessment; an ad category the platform
+itself prohibits; a restricted category without both advertiser
+approval and an allowed jurisdiction; an unmade required attestation;
+or a placement requested against a context the platform refuses to
+serve ads near. A clean placement proposal still always routes to a
+human -- `:actuation/place-campaign` is never auto-committed, at any
+rollout phase.
+
+**Two independent authorities.** The jurisdiction checks answer "is
+this campaign lawful where it runs?"; the media-platform checks answer
+"does the platform it was bought on actually allow it?" (ADR-0002).
+Neither subsumes the other, so both run on every placement.

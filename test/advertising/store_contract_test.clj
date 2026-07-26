@@ -22,10 +22,25 @@
       (is (= 900000 (:proposed-media-spend (store/campaign s "campaign-3"))))
       (is (true? (:misleading-claim-risk-unresolved? (store/campaign s "campaign-4"))))
       (is (false? (:campaign-placed? (store/campaign s "campaign-1"))))
-      (is (= ["campaign-1" "campaign-2" "campaign-3" "campaign-4"]
+      (is (= ["campaign-1" "campaign-2" "campaign-3" "campaign-4"
+              "campaign-5" "campaign-6" "campaign-7" "campaign-8" "campaign-9"]
              (mapv :id (store/all-campaigns s))))
+      (testing "media-platform facts round-trip on both backends (ADR-0002)"
+        (is (= "chatgpt-ads" (:target-platform (store/campaign s "campaign-1"))))
+        (is (= :local-services (:ad-category (store/campaign s "campaign-1"))))
+        (is (false? (:advertiser-approval-on-file? (store/campaign s "campaign-1"))))
+        (is (= {:distinguishable-from-product-ui true
+                :landing-page-consistency true
+                :advertiser-identity-verified true}
+               (:attestations (store/campaign s "campaign-1")))
+            "compound attestation map survives the EDN-blob codec")
+        (is (= [:mental-and-personal-health]
+               (:requested-placement-contexts (store/campaign s "campaign-9")))
+            "compound context vector survives the EDN-blob codec")
+        (is (= "acme-adnet" (:target-platform (store/campaign s "campaign-5")))))
       (is (nil? (store/risk-screen-of s "campaign-1")))
       (is (nil? (store/media-plan-of s "campaign-1")))
+      (is (nil? (store/platform-check-of s "campaign-1")))
       (is (= [] (store/ledger s)))
       (is (= [] (store/placement-history s)))
       (is (zero? (store/next-placement-sequence s "JPN")))
@@ -45,11 +60,17 @@
         (is (= {:jurisdiction "JPN" :checklist ["a" "b"]} (store/media-plan-of s "campaign-1")))
         (store/commit-record! s {:effect :risk-screen/set :path ["campaign-1"]
                                  :payload {:campaign-id "campaign-1" :verdict :resolved}})
-        (is (= {:campaign-id "campaign-1" :verdict :resolved} (store/risk-screen-of s "campaign-1"))))
+        (is (= {:campaign-id "campaign-1" :verdict :resolved} (store/risk-screen-of s "campaign-1")))
+        (store/commit-record! s {:effect :platform-check/set :path ["campaign-1"]
+                                 :payload {:platform "chatgpt-ads" :conformant? true}})
+        (is (= {:platform "chatgpt-ads" :conformant? true}
+               (store/platform-check-of s "campaign-1"))))
       (testing "campaign placement drafts a record and advances the sequence"
         (store/commit-record! s {:effect :campaign/mark-placed :path ["campaign-1"]})
         (is (= "JPN-PLC-000000" (get (first (store/placement-history s)) "record_id")))
         (is (= "campaign-placement-draft" (get (first (store/placement-history s)) "kind")))
+        (is (= "chatgpt-ads" (get (first (store/placement-history s)) "platform"))
+            "the placement record says which media platform it ran on (ADR-0002)")
         (is (true? (:campaign-placed? (store/campaign s "campaign-1"))))
         (is (= 1 (count (store/placement-history s))))
         (is (= 1 (store/next-placement-sequence s "JPN")))

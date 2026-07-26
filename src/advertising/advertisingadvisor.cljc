@@ -28,6 +28,7 @@
                :cljs [cljs.reader :as edn])
             [clojure.string :as str]
             [advertising.facts :as facts]
+            [advertising.platform :as platform]
             [advertising.registry :as registry]
             [advertising.store :as store]
             [langchain.model :as model]))
@@ -75,6 +76,53 @@
        :stake      nil
        :confidence 0.9})))
 
+(defn- verify-platform
+  "Media-platform ad-policy conformance draft (ADR-0002). `:unknown-
+  platform?` injects the failure mode we must defend against:
+  proposing a conformance assessment for a platform with NO
+  transcribed policy in `advertising.platform` -- the Campaign
+  Governor must reject this, exactly as it does for a jurisdiction
+  with no spec-basis. Never infer one ad network's category taxonomy
+  from another's."
+  [db {:keys [subject unknown-platform?]}]
+  (let [c (store/campaign db subject)
+        pid (if unknown-platform? "acme-adnet" (:target-platform c))
+        pb (platform/policy-basis pid)]
+    (if (nil? pb)
+      {:summary    (str "媒体 " (pr-str pid) " の公式広告ポリシーが未登録です")
+       :rationale  "advertising.platform に未登録の媒体。ポリシーを推測で作らない。"
+       :cites      []
+       :effect     :platform-check/set
+       :value      {:platform pid :checklist [] :policy-basis nil}
+       :stake      nil
+       :confidence 0.9}
+      (let [disp (platform/category-disposition pid (:ad-category c))
+            missing (platform/missing-attestations pid (:attestations c))
+            hits (platform/excluded-context-hits pid (:requested-placement-contexts c))
+            conformant? (and (= :permitted disp) (empty? missing) (empty? hits))]
+        {:summary    (str (:name pb) " 広告ポリシー適合性: カテゴリ "
+                          (pr-str (:ad-category c)) " → " (name disp)
+                          (when (seq missing) (str " / 未取得表明 " (count missing) " 件"))
+                          (when (seq hits) (str " / 除外コンテキスト " (count hits) " 件")))
+         :rationale  (str "公式ソース: " (:provenance pb)
+                          " / ポリシー版: " (:policy-version pb)
+                          " / 転記日: " (:read-on pb)
+                          (when (:generative-surface? pb)
+                            " / 生成面のため広告と生成応答の識別可能性が必須"))
+         :cites      [(:policy-basis pb) (:provenance pb)]
+         :effect     :platform-check/set
+         :value      {:platform pid
+                      :checklist (platform/compliance-checklist pid)
+                      :policy-basis (:provenance pb)
+                      :policy-version (:policy-version pb)
+                      :generative-surface? (:generative-surface? pb)
+                      :category-disposition disp
+                      :missing-attestations missing
+                      :excluded-context-hits hits
+                      :conformant? conformant?}
+         :stake      nil
+         :confidence 0.9}))))
+
 (defn- screen-misleading-claim-risk
   "Misleading-claim-risk screening draft. `:misleading-claim-risk-
   unresolved?` on the campaign record injects the failure mode: the
@@ -117,10 +165,13 @@
   [db {:keys [subject]}]
   (let [c (store/campaign db subject)]
     {:summary    (str subject " 向けキャンペーン出稿提案"
-                      (when c (str " (client=" (:client-name c) ")")))
+                      (when c (str " (client=" (:client-name c)
+                                   " platform=" (pr-str (:target-platform c)) ")")))
      :rationale  (if c
                    (str "proposed-media-spend=" (:proposed-media-spend c)
-                        " authorized-budget=" (:authorized-budget c))
+                        " authorized-budget=" (:authorized-budget c)
+                        " target-platform=" (pr-str (:target-platform c))
+                        " ad-category=" (pr-str (:ad-category c)))
                    "案件記録が見つかりません")
      :cites      (if c [subject] [])
      :effect     :campaign/mark-placed
@@ -135,6 +186,7 @@
   (case op
     :campaign/intake                  (normalize-intake db request)
     :media-plan/verify                (verify-media-plan db request)
+    :platform/verify                  (verify-platform db request)
     :risk/screen                      (screen-misleading-claim-risk db request)
     :actuation/place-campaign          (propose-campaign-placement db request)
     {:summary "未対応の操作" :rationale (str op) :cites []
@@ -155,15 +207,21 @@
        "一切書かず、EDNだけを出力します。\n"
        "キー: :summary(人向けドラフト) :rationale(根拠/必ず事実から) "
        ":cites(使った事実キーのベクタ) "
-       ":effect(:campaign/upsert|:media-plan/set|:risk-screen/set|"
+       ":effect(:campaign/upsert|:media-plan/set|:platform-check/set|:risk-screen/set|"
        ":campaign/mark-placed) "
        ":stake(:actuation/place-campaign か nil) :confidence(0..1)。\n"
        "重要: 登録されていない法域の要件を絶対に創作してはいけません。"
-       "spec-basisが無い場合は :cites を空にし confidence を上げないこと。"))
+       "spec-basisが無い場合は :cites を空にし confidence を上げないこと。\n"
+       "同様に、登録されていない媒体(メディアプラットフォーム)の広告ポリシーも"
+       "絶対に創作してはいけません。ある媒体のカテゴリ分類を別の媒体から推測しないこと。"
+       "policy-basisが無い場合は :cites を空にし confidence を上げないこと。"))
 
 (defn- facts-for [st {:keys [op subject]}]
   (case op
     :media-plan/verify                {:campaign (store/campaign st subject)}
+    :platform/verify                  (let [c (store/campaign st subject)]
+                                        {:campaign c
+                                         :platform-policy (platform/policy-basis (:target-platform c))})
     :risk/screen                      {:campaign (store/campaign st subject)}
     :actuation/place-campaign          {:campaign (store/campaign st subject)}
     {:campaign (store/campaign st subject)}))

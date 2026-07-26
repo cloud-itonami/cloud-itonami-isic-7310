@@ -17,6 +17,18 @@
       (is (not (contains? auto :risk/screen))
           (str "phase " n " must not auto-commit :risk/screen")))))
 
+(deftest platform-verify-never-auto-at-any-phase
+  (testing "signing off that a campaign conforms to a media platform's own ad policy is a compliance judgement, never an auto-commit (ADR-0002)"
+    (doseq [[n {:keys [auto]}] phase/phases]
+      (is (not (contains? auto :platform/verify))
+          (str "phase " n " must not auto-commit :platform/verify")))))
+
+(deftest platform-verify-is-enabled-from-phase-2
+  (testing "platform conformance rides with the other verification writes"
+    (is (not (contains? (:writes (get phase/phases 1)) :platform/verify)))
+    (is (contains? (:writes (get phase/phases 2)) :platform/verify))
+    (is (contains? (:writes (get phase/phases 3)) :platform/verify))))
+
 (deftest phase-0-is-fully-read-only
   (is (empty? (:writes (get phase/phases 0)))))
 

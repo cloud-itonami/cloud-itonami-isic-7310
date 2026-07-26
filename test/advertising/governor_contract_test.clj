@@ -26,12 +26,16 @@
   (g/run* actor {:approval {:status :approved :by "op-1"}} {:thread-id tid :resume? true}))
 
 (defn- verify!
-  "Walks `subject` through verify -> approve, leaving a media-plan
-  assessment on file. Uses distinct thread-ids per call site by
-  suffixing `tid-prefix`."
+  "Walks `subject` through BOTH verification ops -> approve, leaving a
+  media-plan assessment AND a media-platform conformance assessment on
+  file -- the full evidence set `:actuation/place-campaign` requires
+  since ADR-0002. Uses distinct thread-ids per call site by suffixing
+  `tid-prefix`."
   [actor tid-prefix subject]
   (exec-op actor (str tid-prefix "-verify") {:op :media-plan/verify :subject subject} operator)
-  (approve! actor (str tid-prefix "-verify")))
+  (approve! actor (str tid-prefix "-verify"))
+  (exec-op actor (str tid-prefix "-pverify") {:op :platform/verify :subject subject} operator)
+  (approve! actor (str tid-prefix "-pverify")))
 
 (deftest clean-intake-auto-commits
   (let [[db actor] (fresh)
@@ -107,6 +111,88 @@
       (is (= :hold (get-in res [:state :disposition])))
       (is (some #{:already-placed} (-> (store/ledger db) last :basis)))
       (is (= 1 (count (store/placement-history db))) "still only the one earlier placement"))))
+
+;; ---------------- media-platform governor family (ADR-0002) ----------------
+;;
+;; Each of these campaigns is CLEAN on every jurisdiction-side check --
+;; lawful spend, no misleading-claim risk, a covered jurisdiction --
+;; and is held purely by the media platform's own published ad policy.
+;; That is the point of the second family: the two authorities are
+;; independent, and clearing one says nothing about the other.
+
+(deftest platform-verify-always-needs-approval
+  (testing "platform conformance is never in any phase's :auto set -- always human approval, even when clean"
+    (let [[db actor] (fresh)
+          res (exec-op actor "p1" {:op :platform/verify :subject "campaign-1"} operator)]
+      (is (= :interrupted (:status res)))
+      (let [r2 (approve! actor "p1")]
+        (is (= :commit (get-in r2 [:state :disposition])))
+        (is (true? (:conformant? (store/platform-check-of db "campaign-1"))))))))
+
+(deftest unknown-platform-is-held
+  (testing "a campaign targeting a platform with no transcribed ad policy -> HOLD, never reaches a human"
+    (let [[db actor] (fresh)
+          res (exec-op actor "p2" {:op :platform/verify :subject "campaign-5"} operator)]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (not= :interrupted (:status res)))
+      (is (some #{:no-platform-policy-basis} (-> (store/ledger db) first :basis)))
+      (is (nil? (store/platform-check-of db "campaign-5")) "no conformance assessment written"))))
+
+(deftest platform-prohibited-category-is-held
+  (testing "a category the platform's own policy names as prohibited -> HOLD"
+    (let [[db actor] (fresh)
+          res (exec-op actor "p3" {:op :platform/verify :subject "campaign-6"} operator)]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:platform-prohibited-category} (-> (store/ledger db) first :basis))))))
+
+(deftest platform-restricted-category-without-approval-is-held
+  (testing "a restricted category with neither advertiser approval nor an allowed jurisdiction -> HOLD"
+    (let [[db actor] (fresh)
+          res (exec-op actor "p4" {:op :platform/verify :subject "campaign-7"} operator)]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:platform-restricted-category-unapproved} (-> (store/ledger db) first :basis))))))
+
+(deftest generative-surface-distinguishability-must-be-attested
+  (testing "on a generative surface, an unattested ad/answer distinguishability -> HOLD (interface mimicry)"
+    (let [[db actor] (fresh)
+          res (exec-op actor "p5" {:op :platform/verify :subject "campaign-8"} operator)]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:platform-attestation-missing} (-> (store/ledger db) first :basis))))))
+
+(deftest excluded-placement-context-is-held
+  (testing "a placement requested against a context the platform refuses to serve ads near -> HOLD"
+    (let [[db actor] (fresh)
+          res (exec-op actor "p6" {:op :platform/verify :subject "campaign-9"} operator)]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:sensitive-placement-context} (-> (store/ledger db) first :basis))))))
+
+(deftest place-campaign-without-platform-check-is-held
+  (testing "clearing the JURISDICTION's evidence checklist does not clear the PLATFORM -- actuation still holds"
+    (let [[db actor] (fresh)]
+      (exec-op actor "p7-verify" {:op :media-plan/verify :subject "campaign-1"} operator)
+      (approve! actor "p7-verify")
+      (let [res (exec-op actor "p7" {:op :actuation/place-campaign :subject "campaign-1"} operator)]
+        (is (= :hold (get-in res [:state :disposition])))
+        (is (some #{:platform-check-incomplete} (-> (store/ledger db) last :basis)))
+        (is (empty? (store/placement-history db)))))))
+
+(deftest platform-holds-survive-a-human-approver
+  (testing "the platform family is HARD: a prohibited category never reaches request-approval at all, so there is nobody to override it"
+    (let [[db actor] (fresh)]
+      (verify! actor "p8pre" "campaign-6")
+      (let [res (exec-op actor "p8" {:op :actuation/place-campaign :subject "campaign-6"} operator)]
+        (is (= :hold (get-in res [:state :disposition])))
+        (is (not= :interrupted (:status res)) "never pauses for a human")
+        (is (some #{:platform-prohibited-category} (-> (store/ledger db) last :basis)))
+        (is (empty? (store/placement-history db)))))))
+
+(deftest placement-record-names-the-platform
+  (testing "a committed placement records WHICH platform it ran on"
+    (let [[db actor] (fresh)]
+      (verify! actor "p9pre" "campaign-1")
+      (exec-op actor "p9" {:op :actuation/place-campaign :subject "campaign-1"} operator)
+      (approve! actor "p9")
+      (is (= "chatgpt-ads" (get (first (store/placement-history db)) "platform"))))))
 
 (deftest every-decision-leaves-one-ledger-fact
   (testing "write-only-through-ledger: N operations -> N ledger facts"

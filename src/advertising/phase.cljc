@@ -5,7 +5,9 @@
     Phase 0  read-only        -- no writes, still governor-gated.
     Phase 1  assisted-intake  -- campaign intake allowed, every write
                                  needs human approval.
-    Phase 2  assisted-verify  -- adds media-plan verification +
+    Phase 2  assisted-verify  -- adds media-plan verification, media-
+                                 platform ad-policy conformance
+                                 (`:platform/verify`, ADR-0002) and
                                  misleading-claim-risk screening
                                  writes, still approval.
     Phase 3  supervised auto  -- governor-clean, high-confidence
@@ -22,13 +24,16 @@
   `advertising.governor`'s `:actuation/place-campaign` high-stakes
   gate enforces the same invariant independently -- two layers, not
   one, agree on this. `:risk/screen` is likewise never auto-eligible,
-  at any phase -- the same posture every sibling's screening op has.
+  at any phase -- the same posture every sibling's screening op has,
+  and `:platform/verify` (ADR-0002) inherits it for the same reason:
+  signing off that a campaign conforms to a media platform's own ad
+  policy is a compliance judgement, not a normalization.
   Phase 3's `:auto` set here has only ONE member (`:campaign/intake`)
   -- this domain has no separate no-capital-risk 'file' lifecycle
   distinct from the campaign record itself.")
 
 (def read-ops  #{})
-(def write-ops #{:campaign/intake :media-plan/verify :risk/screen
+(def write-ops #{:campaign/intake :media-plan/verify :platform/verify :risk/screen
                  :actuation/place-campaign})
 
 ;; NOTE the invariant: `:actuation/place-campaign` is a member of
@@ -39,7 +44,7 @@
   auto-commit when governor-clean>}."
   {0 {:label "read-only"        :writes #{}                                                          :auto #{}}
    1 {:label "assisted-intake"  :writes #{:campaign/intake}                                          :auto #{}}
-   2 {:label "assisted-verify"  :writes #{:campaign/intake :media-plan/verify :risk/screen}           :auto #{}}
+   2 {:label "assisted-verify"  :writes #{:campaign/intake :media-plan/verify :platform/verify :risk/screen} :auto #{}}
    3 {:label "supervised-auto"  :writes write-ops
       :auto #{:campaign/intake}}})
 

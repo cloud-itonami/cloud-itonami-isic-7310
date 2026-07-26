@@ -30,9 +30,14 @@
     - one op that auto-commits clean at phase 3 (:campaign/intake)
     - the one always-escalate high-stakes op (:actuation/place-campaign),
       approved by a human
-    - four DISTINCT HARD-hold reasons that never reach a human:
-      :no-spec-basis, :media-spend-exceeds-authorized-budget,
-      :misleading-claim-risk-unresolved, :already-placed."
+    - TEN DISTINCT HARD-hold reasons that never reach a human. Four are
+      jurisdiction-side: :no-spec-basis,
+      :media-spend-exceeds-authorized-budget,
+      :misleading-claim-risk-unresolved, :already-placed. Six are
+      media-platform-side (ADR-0002): :no-platform-policy-basis,
+      :platform-check-incomplete, :platform-prohibited-category,
+      :platform-restricted-category-unapproved,
+      :platform-attestation-missing, :sensitive-placement-context."
   []
   (let [db (store/seed-db)
         actor (op/build db)]
@@ -43,6 +48,11 @@
     ;; campaign-1: media-plan verification -- escalates (phase-approval), approved.
     (exec! actor "t2" {:op :media-plan/verify :subject "campaign-1"})
     (approve! actor "t2")
+
+    ;; campaign-1: media-platform ad-policy conformance (chatgpt-ads,
+    ;; :local-services permitted) -- escalates, approved.
+    (exec! actor "t2b" {:op :platform/verify :subject "campaign-1"})
+    (approve! actor "t2b")
 
     ;; campaign-1: misleading-claim-risk screening -- clean, escalates, approved.
     (exec! actor "t3" {:op :risk/screen :subject "campaign-1"})
@@ -57,10 +67,12 @@
     ;; never reaches a human.
     (exec! actor "t5" {:op :media-plan/verify :subject "campaign-2" :no-spec? true})
 
-    ;; campaign-3 (JPN): media-plan verification escalates, approved -- sets up
+    ;; campaign-3 (JPN): both verifications escalate, approved -- sets up
     ;; the budget-exceeded HARD hold below.
     (exec! actor "t6" {:op :media-plan/verify :subject "campaign-3"})
     (approve! actor "t6")
+    (exec! actor "t6b" {:op :platform/verify :subject "campaign-3"})
+    (approve! actor "t6b")
 
     ;; campaign-3: proposed media spend 900000 > authorized budget 800000 ->
     ;; HARD hold, :media-spend-exceeds-authorized-budget -- never reaches a human.
@@ -73,6 +85,40 @@
     ;; campaign-1 AGAIN: already placed in t4 -> HARD hold, :already-placed --
     ;; never reaches a human.
     (exec! actor "t9" {:op :actuation/place-campaign :subject "campaign-1"})
+
+    ;; ---- media-platform HARD holds (ADR-0002). Every campaign below is
+    ;; CLEAN on every jurisdiction-side check and is held purely by the
+    ;; media platform's own published ad policy.
+
+    ;; campaign-5: platform "acme-adnet" has no transcribed policy ->
+    ;; HARD hold, :no-platform-policy-basis.
+    (exec! actor "t10" {:op :platform/verify :subject "campaign-5"})
+
+    ;; campaign-6: :gambling is prohibited by the platform's own policy ->
+    ;; HARD hold, :platform-prohibited-category.
+    (exec! actor "t11" {:op :platform/verify :subject "campaign-6"})
+
+    ;; campaign-7: :financial-services is restricted -- unapproved advertiser,
+    ;; and JPN is outside the platform's restricted-category jurisdictions ->
+    ;; HARD hold, :platform-restricted-category-unapproved.
+    (exec! actor "t12" {:op :platform/verify :subject "campaign-7"})
+
+    ;; campaign-8: generative surface, ad/answer distinguishability never
+    ;; attested -> HARD hold, :platform-attestation-missing.
+    (exec! actor "t13" {:op :platform/verify :subject "campaign-8"})
+
+    ;; campaign-9: placement requested against a context the platform refuses
+    ;; to serve ads near -> HARD hold, :sensitive-placement-context.
+    (exec! actor "t14" {:op :platform/verify :subject "campaign-9"})
+
+    ;; campaign-6: jurisdiction evidence cleared, then placement attempted.
+    ;; TWO platform-side rules accumulate in one decision --
+    ;; :platform-check-incomplete (no conformance assessment on file, because
+    ;; t11 above HELD instead of writing one) and :platform-prohibited-category
+    ;; -- showing that clearing the jurisdiction side clears nothing here.
+    (exec! actor "t15" {:op :media-plan/verify :subject "campaign-6"})
+    (approve! actor "t15")
+    (exec! actor "t16" {:op :actuation/place-campaign :subject "campaign-6"})
 
     db))
 

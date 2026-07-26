@@ -2472,25 +2472,39 @@ img,svg { max-width: 100%; height: auto; }</style></head><body>
 <tr><td><code>campaign-2</code></td><td>Atlantis Goods</td><td>ATL</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: no-spec-basis</td></tr>
 <tr><td><code>campaign-3</code></td><td>鈴木工務店</td><td>JPN</td><td>900000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: media-spend-exceeds-authorized-budget</td></tr>
 <tr><td><code>campaign-4</code></td><td>田中青果</td><td>JPN</td><td>500000</td><td>800000</td><td class="err">unresolved</td><td class="muted">not placed</td><td class="err">governor-hold: misleading-claim-risk-unresolved</td></tr>
+<tr><td><code>campaign-5</code></td><td>Kaneko Tools</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: no-platform-policy-basis</td></tr>
+<tr><td><code>campaign-6</code></td><td>Lucky Palace</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: platform-check-incomplete,platform-prohibited-category</td></tr>
+<tr><td><code>campaign-7</code></td><td>Marunouchi Lending</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: platform-restricted-category-unapproved</td></tr>
+<tr><td><code>campaign-8</code></td><td>Yamada Travel</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: platform-attestation-missing</td></tr>
+<tr><td><code>campaign-9</code></td><td>Aoi Clinic Supplies</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: sensitive-placement-context</td></tr>
 </tbody></table>
 <h2>Action gate (advertising.phase x advertising.governor/high-stakes)</h2>
 <table><thead><tr><th>phase</th><th>label</th><th>writes allowed</th><th>auto-commit eligible (governor-clean)</th><th>always-escalate (high-stakes)</th></tr></thead><tbody>
 <tr><td>0</td><td>read-only</td><td><span class="muted">none</span></td><td><span class="muted">none -- human approval required</span></td><td>place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
 <tr><td>1</td><td>assisted-intake</td><td>intake</td><td><span class="muted">none -- human approval required</span></td><td>place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
-<tr><td>2</td><td>assisted-verify</td><td>intake, screen, verify</td><td><span class="muted">none -- human approval required</span></td><td>place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
-<tr><td>3</td><td>supervised-auto</td><td>intake, place-campaign, screen, verify</td><td>intake</td><td>place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
+<tr><td>2</td><td>assisted-verify</td><td>intake, screen, verify, verify</td><td><span class="muted">none -- human approval required</span></td><td>place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
+<tr><td>3</td><td>supervised-auto</td><td>intake, place-campaign, screen, verify, verify</td><td>intake</td><td>place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
 </tbody></table>
 <h2>Audit ledger (append-only, advertising.store/ledger)</h2>
 <table><thead><tr><th>#</th><th>op</th><th>subject</th><th>actor</th><th>disposition</th><th>basis / hold rules</th><th>confidence</th></tr></thead><tbody>
 <tr><td>1</td><td><code>intake</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>id, client-name</td><td><span class="muted">--</span></td></tr>
 <tr><td>2</td><td><code>verify</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>不当景品類及び不当表示防止法 (Act against Unjustifiable Premiums and Misleading Representations, 景品表示法), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
-<tr><td>3</td><td><code>screen</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>misleading-claim-check</td><td><span class="muted">--</span></td></tr>
-<tr><td>4</td><td><code>place-campaign</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>campaign-1</td><td><span class="muted">--</span></td></tr>
-<tr><td>5</td><td><code>verify</code></td><td><code>campaign-2</code></td><td>op-1</td><td class="err">hold</td><td>no-spec-basis</td><td>0.9</td></tr>
-<tr><td>6</td><td><code>verify</code></td><td><code>campaign-3</code></td><td>op-1</td><td class="ok">commit</td><td>不当景品類及び不当表示防止法 (Act against Unjustifiable Premiums and Misleading Representations, 景品表示法), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
-<tr><td>7</td><td><code>place-campaign</code></td><td><code>campaign-3</code></td><td>op-1</td><td class="err">hold</td><td>media-spend-exceeds-authorized-budget</td><td>0.3</td></tr>
-<tr><td>8</td><td><code>screen</code></td><td><code>campaign-4</code></td><td>op-1</td><td class="err">hold</td><td>misleading-claim-risk-unresolved</td><td>0.95</td></tr>
-<tr><td>9</td><td><code>place-campaign</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="err">hold</td><td>already-placed</td><td>0.9</td></tr>
+<tr><td>3</td><td><code>verify</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>OpenAI 広告ポリシー (OpenAI Ad policies), https://openai.com/policies/ad-policies/</td><td><span class="muted">--</span></td></tr>
+<tr><td>4</td><td><code>screen</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>misleading-claim-check</td><td><span class="muted">--</span></td></tr>
+<tr><td>5</td><td><code>place-campaign</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>campaign-1</td><td><span class="muted">--</span></td></tr>
+<tr><td>6</td><td><code>verify</code></td><td><code>campaign-2</code></td><td>op-1</td><td class="err">hold</td><td>no-spec-basis</td><td>0.9</td></tr>
+<tr><td>7</td><td><code>verify</code></td><td><code>campaign-3</code></td><td>op-1</td><td class="ok">commit</td><td>不当景品類及び不当表示防止法 (Act against Unjustifiable Premiums and Misleading Representations, 景品表示法), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
+<tr><td>8</td><td><code>verify</code></td><td><code>campaign-3</code></td><td>op-1</td><td class="ok">commit</td><td>OpenAI 広告ポリシー (OpenAI Ad policies), https://openai.com/policies/ad-policies/</td><td><span class="muted">--</span></td></tr>
+<tr><td>9</td><td><code>place-campaign</code></td><td><code>campaign-3</code></td><td>op-1</td><td class="err">hold</td><td>media-spend-exceeds-authorized-budget</td><td>0.3</td></tr>
+<tr><td>10</td><td><code>screen</code></td><td><code>campaign-4</code></td><td>op-1</td><td class="err">hold</td><td>misleading-claim-risk-unresolved</td><td>0.95</td></tr>
+<tr><td>11</td><td><code>place-campaign</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="err">hold</td><td>already-placed</td><td>0.9</td></tr>
+<tr><td>12</td><td><code>verify</code></td><td><code>campaign-5</code></td><td>op-1</td><td class="err">hold</td><td>no-platform-policy-basis</td><td>0.9</td></tr>
+<tr><td>13</td><td><code>verify</code></td><td><code>campaign-6</code></td><td>op-1</td><td class="err">hold</td><td>platform-prohibited-category</td><td>0.9</td></tr>
+<tr><td>14</td><td><code>verify</code></td><td><code>campaign-7</code></td><td>op-1</td><td class="err">hold</td><td>platform-restricted-category-unapproved</td><td>0.9</td></tr>
+<tr><td>15</td><td><code>verify</code></td><td><code>campaign-8</code></td><td>op-1</td><td class="err">hold</td><td>platform-attestation-missing</td><td>0.9</td></tr>
+<tr><td>16</td><td><code>verify</code></td><td><code>campaign-9</code></td><td>op-1</td><td class="err">hold</td><td>sensitive-placement-context</td><td>0.9</td></tr>
+<tr><td>17</td><td><code>verify</code></td><td><code>campaign-6</code></td><td>op-1</td><td class="ok">commit</td><td>不当景品類及び不当表示防止法 (Act against Unjustifiable Premiums and Misleading Representations, 景品表示法), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
+<tr><td>18</td><td><code>place-campaign</code></td><td><code>campaign-6</code></td><td>op-1</td><td class="err">hold</td><td>platform-check-incomplete, platform-prohibited-category</td><td>0.9</td></tr>
 </tbody></table>
 <h2>Draft campaign-placement records (advertising.registry, unsigned)</h2>
 <table><thead><tr><th>record_id</th><th>campaign_id</th><th>jurisdiction</th><th>kind</th></tr></thead><tbody>
