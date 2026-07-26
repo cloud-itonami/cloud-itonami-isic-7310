@@ -194,6 +194,42 @@
       (approve! actor "p9")
       (is (= "chatgpt-ads" (get (first (store/placement-history db)) "platform"))))))
 
+;; ---------------- cross-platform disagreement (ADR-0003) ----------------
+
+(deftest same-category-same-jurisdiction-different-platform-different-verdict
+  (testing "campaign-1 and campaign-10 are both JPN :local-services; only the target platform differs, and both clear"
+    (let [[db actor] (fresh)]
+      (exec-op actor "x1" {:op :platform/verify :subject "campaign-1"} operator)
+      (approve! actor "x1")
+      (exec-op actor "x2" {:op :platform/verify :subject "campaign-10"} operator)
+      (approve! actor "x2")
+      (is (= "chatgpt-ads" (:platform (store/platform-check-of db "campaign-1"))))
+      (is (= "google-ads" (:platform (store/platform-check-of db "campaign-10"))))
+      (is (true? (:conformant? (store/platform-check-of db "campaign-10")))
+          "google-ads does not name :local-services and does not close its category set"))))
+
+(deftest microsoft-holds-a-category-chatgpt-permits
+  (testing "campaign-12 is :travel-experiences -- permitted on chatgpt-ads, restricted on microsoft-advertising with no transcribed country table"
+    (let [[db actor] (fresh)
+          res (exec-op actor "x3" {:op :platform/verify :subject "campaign-12"} operator)]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:platform-restricted-category-unapproved} (-> (store/ledger db) first :basis)))
+      (is (nil? (store/platform-check-of db "campaign-12"))))))
+
+(deftest jurisdiction-scoped-attestation-holds-only-where-it-applies
+  (testing "campaign-11 runs on meta-ads in DEU and has not made the EU DSA beneficiary/payer disclosure"
+    (let [[db actor] (fresh)
+          res (exec-op actor "x4" {:op :platform/verify :subject "campaign-11"} operator)]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:platform-attestation-missing} (-> (store/ledger db) first :basis)))))
+  (testing "the same campaign facts in JPN would NOT be held -- the requirement follows the jurisdiction"
+    (let [[db actor] (fresh)]
+      (store/commit-record! db {:effect :campaign/upsert
+                                :value {:id "campaign-11" :jurisdiction "JPN"}})
+      (exec-op actor "x5" {:op :platform/verify :subject "campaign-11"} operator)
+      (approve! actor "x5")
+      (is (true? (:conformant? (store/platform-check-of db "campaign-11")))))))
+
 (deftest every-decision-leaves-one-ledger-fact
   (testing "write-only-through-ledger: N operations -> N ledger facts"
     (let [[db actor] (fresh)]
