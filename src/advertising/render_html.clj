@@ -5,7 +5,8 @@
   -> advertising.store) through the SAME multi-disposition scenario as
   `advertising.sim` (real seed ids/ops -- see that ns for the narrative).
   No invented numbers, no timestamps, byte-identical across reruns."
-  (:require [clojure.string :as str]
+  (:require [jp-go-dds.skin]
+            [clojure.string :as str]
             [advertising.store :as store]
             [advertising.operation :as op]
             [advertising.phase :as phase]
@@ -187,7 +188,9 @@
    ["<!doctype html><html lang=\"ja\"><head><meta charset=\"utf-8\">"
     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
     "<title>advertising operator console (generated)</title>"
-    (str "<style>" css "</style></head><body>")
+    (str "<style>"
+   (jp-go-dds.skin/dds+skin)
+   "</style></head><body>")
     "<h1>cloud-itonami-isic-7310 -- Advertising Operator Console</h1>"
     (str "<p class=\"lede\">Generated at build time by <code>advertising.render-html</code>, "
          "driving the real <code>advertising.operation</code> StateGraph (intake -&gt; advise -&gt; "
