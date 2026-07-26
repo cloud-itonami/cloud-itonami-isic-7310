@@ -61,16 +61,23 @@
   {:target-platform "chatgpt-ads"
    :ad-category :local-services
    :advertiser-approval-on-file? false
+   ;; every BASE attestation any seeded platform requires, so switching
+   ;; :target-platform alone never makes a campaign dirty by accident.
+   ;; Jurisdiction-scoped attestations (Meta's EU DSA disclosure) are
+   ;; deliberately NOT here -- campaign-11 exists to be held by one.
    :attestations {:distinguishable-from-product-ui true
                   :landing-page-consistency true
-                  :advertiser-identity-verified true}
+                  :advertiser-identity-verified true
+                  :editorial-standards true}
    :requested-placement-contexts []})
 
 (defn demo-data
   "A small, self-contained campaign set covering the actuation
   lifecycle (placing a campaign) so the actor + tests run offline.
   campaign-1..4 exercise the jurisdiction-side governor checks;
-  campaign-5..9 exercise the media-platform-side ones."
+  campaign-5..9 the media-platform-side ones on `chatgpt-ads`; and
+  campaign-10..12 the fact that the four seeded platforms DISAGREE
+  (ADR-0003) -- same category, same jurisdiction, different verdict."
   []
   {:campaigns
    {"campaign-1" (merge clean-platform-facts
@@ -138,6 +145,39 @@
     "campaign-9" (merge clean-platform-facts
                  {:id "campaign-9" :client-name "Aoi Clinic Supplies"
                  :requested-placement-contexts [:mental-and-personal-health]
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+    ;; -- cross-platform disagreement (ADR-0003) --
+    ;; google-ads, OPEN category set: :local-services is unnamed by that
+    ;; policy, so it resolves :permitted and this campaign is placeable --
+    ;; the same category, on the same jurisdiction, as campaign-1.
+    "campaign-10" (merge clean-platform-facts
+                 {:id "campaign-10" :client-name "Ishikawa Dental"
+                 :target-platform "google-ads"
+                 :ad-category :local-services
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+    ;; meta-ads in DEU: the EU DSA beneficiary/payer disclosure is required
+    ;; only where it applies, and this campaign has not made it.
+    "campaign-11" (merge clean-platform-facts
+                 {:id "campaign-11" :client-name "Berliner Möbelhaus"
+                 :target-platform "meta-ads"
+                 :ad-category :lifestyle-household
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "DEU" :status :intake})
+    ;; microsoft-advertising: :travel-experiences is RESTRICTED there while
+    ;; being PERMITTED on chatgpt-ads, and the per-category country table
+    ;; has not been transcribed -- so it holds on both counts.
+    "campaign-12" (merge clean-platform-facts
+                 {:id "campaign-12" :client-name "Hokkaido Onsen Tours"
+                 :target-platform "microsoft-advertising"
+                 :ad-category :travel-experiences
                  :proposed-media-spend 500000 :authorized-budget 800000
                  :misleading-claim-risk-unresolved? false
                  :campaign-placed? false

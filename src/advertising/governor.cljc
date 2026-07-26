@@ -286,8 +286,13 @@
               :detail (str "制限カテゴリ " (pr-str (:ad-category c)) " / 媒体 " (pr-str pid)
                            (when-not approved? " — 広告主事前承認が未取得")
                            (when-not juris-ok?
-                             (str " — 法域 " (pr-str (:jurisdiction c))
-                                  " は当該媒体の制限カテゴリ許可法域外")))}]))))))
+                             (if (= :per-category-unenumerated
+                                    (:restricted-category-jurisdictions
+                                     (platform/policy-basis pid)))
+                               (str " — 当該媒体の制限カテゴリ国別許可表が未転記のため法域 "
+                                    (pr-str (:jurisdiction c)) " の可否を判定できない(未知は hold)")
+                               (str " — 法域 " (pr-str (:jurisdiction c))
+                                    " は当該媒体の制限カテゴリ許可法域外"))))}]))))))
 
 (defn- platform-attestation-missing-violations
   "The platform requires the agency to positively ASSERT certain facts
@@ -306,10 +311,11 @@
   (when (contains? platform-gated-ops op)
     (let [c (store/campaign st subject)
           pid (:target-platform c)
-          missing (platform/missing-attestations pid (:attestations c))]
+          missing (platform/missing-attestations pid (:jurisdiction c) (:attestations c))]
       (when (seq missing)
         [{:rule :platform-attestation-missing
           :detail (str "媒体 " (pr-str pid) " の必須表明が未取得: " (pr-str missing)
+                       " (法域 " (pr-str (:jurisdiction c)) ")"
                        (when (platform/generative-surface? pid)
                          " (生成面のため広告と生成応答の識別可能性が必須)"))}]))))
 

@@ -96,8 +96,9 @@
        :value      {:platform pid :checklist [] :policy-basis nil}
        :stake      nil
        :confidence 0.9}
-      (let [disp (platform/category-disposition pid (:ad-category c))
-            missing (platform/missing-attestations pid (:attestations c))
+      (let [iso3 (:jurisdiction c)
+            disp (platform/category-disposition pid (:ad-category c))
+            missing (platform/missing-attestations pid iso3 (:attestations c))
             hits (platform/excluded-context-hits pid (:requested-placement-contexts c))
             conformant? (and (= :permitted disp) (empty? missing) (empty? hits))]
         {:summary    (str (:name pb) " 広告ポリシー適合性: カテゴリ "
@@ -112,7 +113,8 @@
          :cites      [(:policy-basis pb) (:provenance pb)]
          :effect     :platform-check/set
          :value      {:platform pid
-                      :checklist (platform/compliance-checklist pid)
+                      :checklist (platform/compliance-checklist pid iso3)
+                      :cross-platform (platform/cross-platform-disposition (:ad-category c))
                       :policy-basis (:provenance pb)
                       :policy-version (:policy-version pb)
                       :generative-surface? (:generative-surface? pb)

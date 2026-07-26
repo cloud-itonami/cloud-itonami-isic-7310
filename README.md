@@ -221,7 +221,7 @@ the generic robotics/identity/forms/dmn/bpmn/audit-ledger stack only
 | `src/advertising/store.cljc` | **Store** protocol -- `MemStore` ‖ `DatomicStore` (`langchain.db`) + append-only audit ledger + campaign-placement history. No dynamically-filed sub-record -- the actuation op acts directly on a pre-seeded campaign, and the double-actuation guard checks a dedicated `:campaign-placed?` boolean rather than a `:status` value |
 | `src/advertising/registry.cljc` | Campaign-placement draft records, plus `media-spend-exceeds-authorized-budget?` -- the SEVENTH instance of this fleet's MAXIMUM-ceiling check family (`facility`/`school`/`card`/`recovery`/`care`/`navigator` established the first six) |
 | `src/advertising/facts.cljc` | Per-jurisdiction advertising-standards catalog with an official spec-basis citation per entry, honest coverage reporting |
-| `src/advertising/platform.cljc` | Per-media-platform ad-policy catalog (ADR-0002) -- category taxonomy, restricted-category jurisdictions, excluded placement contexts, required attestations and `:generative-surface?`, each transcribed from a DIRECT read of the platform's own published policy with the URL, version and read date recorded; honest coverage reporting |
+| `src/advertising/platform.cljc` | Per-media-platform ad-policy catalog (ADR-0002 / ADR-0003) -- 4 platforms (`chatgpt-ads`, `google-ads`, `meta-ads`, `microsoft-advertising`) over one shared `category-vocabulary`; category taxonomy, open-vs-closed category sets, restricted-category jurisdictions, excluded placement contexts, base + jurisdiction-scoped attestations and `:generative-surface?`, each transcribed from a DIRECT read of the platform's own published policy with the URL, version and read date recorded; `cross-platform-disposition` + honest coverage reporting |
 | `src/advertising/advertisingadvisor.cljc` | **AdOps-LLM** -- `mock-advisor` ‖ `llm-advisor`; intake/media-plan-verification/media-platform-conformance/misleading-claim-risk-screening/campaign-placement proposals |
 | `src/advertising/governor.cljc` | **Campaign Governor** -- 4 jurisdiction-side HARD checks (spec-basis · evidence-incomplete · media-spend-exceeds-authorized-budget, pure ground-truth ceiling recompute · misleading-claim-risk-unresolved, unconditional evaluation, the THIRTY-EIGHTH grounding of this discipline, a genuinely new concept grounded in this blueprint's own Trust Control text) + already-placed guard + 6 media-platform-side HARD checks (ADR-0002) + 1 soft (confidence/actuation gate) |
 | `src/advertising/phase.cljc` | **Phase 0→3** -- read-only → assisted intake → assisted verify (media-plan + media-platform conformance) → supervised (campaign placement always human; campaign intake is the ONLY auto-eligible op, no direct capital risk) |
@@ -264,23 +264,67 @@ make coverage look bigger.
 ## Media-platform coverage (honest)
 
 `advertising.platform/coverage` reports how many requested media
-platforms actually have a transcribed ad policy in `advertising.
-platform/catalog` -- currently **one**: `chatgpt-ads`, transcribed
-from a direct read of the [OpenAI 広告ポリシー](https://openai.com/policies/ad-policies/)
-(the document's own v1.3 / 更新 2026年7月15日) on 2026-07-26.
+platforms actually have a transcribed ad policy in
+`advertising.platform/catalog`. **Four are seeded**, each transcribed
+from a direct read of the platform's own published policy:
 
-`google-ads`, `meta-ads` and Microsoft Advertising publish real
-policies at real URLs and are **deliberately absent**. Their policies
-had not been read end-to-end when this catalog was written, so there
-was no honest taxonomy to transcribe, and an invented
-`:prohibited-categories` set is strictly worse than an absent one: an
-absent platform HARD-holds on `no-platform-policy-basis`, while an
-invented one waves campaigns through on made-up rules. Adding a
-platform is additive and cheap — read that platform's own published
-policy, transcribe its taxonomy, record the URL, the version the
-document states for itself, and the date you read it. Never seed a
-platform from memory, from a search-result summary, or by inferring
-one network's taxonomy from another's.
+| platform | policy read | on |
+|---|---|---|
+| `chatgpt-ads` | [OpenAI 広告ポリシー](https://openai.com/policies/ad-policies/) (v1.3 / 更新 2026年7月15日) | 2026-07-26 |
+| `google-ads` | [Google 広告のポリシー](https://support.google.com/adspolicy/answer/6008942) | 2026-07-27 |
+| `meta-ads` | [Meta 広告規定](https://transparency.meta.com/policies/ad-standards/) | 2026-07-27 |
+| `microsoft-advertising` | [Disallowed Content](https://about.ads.microsoft.com/en-us/policies/disallowed-content) + [Restricted Content](https://about.ads.microsoft.com/en-us/policies/restricted-categories) | 2026-07-27 |
+
+**They disagree, and the catalog keeps them disagreeing** — that is the
+whole reason platforms are modelled separately instead of merged into
+one "advertising rules" table:
+
+| category | `chatgpt-ads` | `google-ads` | `meta-ads` | `microsoft-advertising` |
+|---|---|---|---|---|
+| `:travel-experiences` | permitted | permitted | permitted | **restricted** |
+| `:legal-services` | **prohibited** | permitted | permitted | restricted |
+| `:political` | prohibited | **restricted** | **restricted** | prohibited |
+| `:ticket-reselling` | **not-permitted** | permitted | permitted | restricted |
+
+`advertising.platform/cross-platform-disposition` answers this directly
+— the question an agency asks before it buys ("where can I run this at
+all?"). A campaign's `:ad-category` is drawn from one shared
+`category-vocabulary`, so the same declared category is what resolves
+differently, not a different word per platform.
+
+Two structural differences fall out of the transcription and are worth
+knowing before reading a verdict:
+
+- **Open vs closed category sets.** ChatGPT states that every category
+  it does not name is disallowed at launch, so an unnamed category
+  resolves `:not-permitted` there. The other three enumerate what is
+  prohibited and restricted without closing the set, so an unnamed
+  category resolves `:permitted`. This is transcribed per platform
+  (`:closed-category-set?`), not assumed.
+- **Untranscribed country tables hold.** Google, Meta and Microsoft all
+  limit restricted categories by country, but those tables live on
+  per-category sub-pages that were not read. Those entries record
+  `:restricted-category-jurisdictions :per-category-unenumerated`,
+  which makes `restricted-category-allowed-jurisdiction?` return
+  **false everywhere** — every restricted-category placement HARD-holds
+  until someone transcribes the relevant table. Not knowing is a hold,
+  never a quiet yes.
+
+Every entry's `:transcription-notes` states what it does **not**
+capture. Most importantly, all four platforms keep open-ended reserve
+clauses (Google's 「その他の制限付きビジネス」, Microsoft's "Areas of
+Questionable Legality" / "Other Market Restricted Products and
+Services") which are not enumerable — so **a clean verdict from this
+catalog is a necessary, not a sufficient, condition for platform
+approval.**
+
+Adding a platform is additive and cheap — read that platform's own
+published policy, transcribe its taxonomy, record the URL, the version
+the document states for itself, and the date you read it. Never seed a
+platform from memory, from a search-result summary, or by inferring one
+network's taxonomy from another's: an absent platform HARD-holds on
+`no-platform-policy-basis`, while an invented one waves campaigns
+through on made-up rules.
 
 ### Why `:generative-surface?` is a first-class fact
 
@@ -306,9 +350,12 @@ creative review with a note.
 tested code (see `Run` above), promoted from the originally-published
 `:blueprint`-tier scaffold, modeled closely on the fifty-three prior
 actors' architecture. See `docs/adr/0001-architecture.md` for the
-history and design, and `docs/adr/0002-media-platform-layer.md` for
-the media-platform layer (`advertising.platform`, `:platform/verify`
-and the six platform-side governor checks).
+history and design, `docs/adr/0002-media-platform-layer.md` for the
+media-platform layer (`advertising.platform`, `:platform/verify` and
+the six platform-side governor checks), and
+`docs/adr/0003-multi-platform-catalog.md` for the expansion to four
+platforms, the shared category vocabulary and jurisdiction-scoped
+attestations.
 
 ## License
 

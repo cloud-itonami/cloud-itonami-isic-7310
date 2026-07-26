@@ -10,7 +10,13 @@
   governor's `no-platform-policy-basis` hold is the only thing standing
   between an unknown ad network and a real placement, and a helper
   that cheerfully answers ':permitted' for a platform it has never
-  heard of would route around it."
+  heard of would route around it.
+
+  Since ADR-0003 a third thing is under test: that the four seeded
+  platforms are allowed to DISAGREE. The cross-platform tests below
+  assert specific disagreements as transcribed, so a future 'tidy-up'
+  that harmonises the taxonomies has to delete a test that says, in
+  words, why it must not."
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [advertising.platform :as platform]))
@@ -37,13 +43,63 @@
         (is (empty? (filter permitted-categories prohibited-categories)))
         (is (empty? (filter restricted-categories prohibited-categories)))))))
 
+(deftest every-catalogued-category-is-in-the-shared-vocabulary
+  (testing "a category outside the vocabulary would resolve differently per platform by typo, not by policy"
+    (doseq [[pid {:keys [permitted-categories restricted-categories prohibited-categories]}]
+            platform/catalog]
+      (testing pid
+        (doseq [c (concat permitted-categories restricted-categories prohibited-categories)]
+          (is (contains? platform/category-vocabulary c)
+              (str c " must be a member of platform/category-vocabulary")))))))
+
 (deftest coverage-reports-unread-platforms-as-missing
-  (let [c (platform/coverage ["chatgpt-ads" "google-ads" "meta-ads"])]
-    (is (= 3 (:requested c)))
-    (is (= 1 (:covered c)))
-    (is (= ["chatgpt-ads"] (:covered-platforms c)))
-    (is (= ["google-ads" "meta-ads"] (:missing-platforms c))
-        "a platform whose policy URL is known but UNREAD is missing, not covered")))
+  (let [c (platform/coverage ["chatgpt-ads" "google-ads" "meta-ads" "acme-adnet"])]
+    (is (= 4 (:requested c)))
+    (is (= 3 (:covered c)))
+    (is (= ["chatgpt-ads" "google-ads" "meta-ads"] (:covered-platforms c)))
+    (is (= ["acme-adnet"] (:missing-platforms c))
+        "a platform whose policy has not been transcribed is missing, not covered")))
+
+;; ----------------------------- cross-platform disagreement -----------------------------
+
+(deftest platforms-disagree-and-must-keep-disagreeing
+  (testing "travel: permitted on chatgpt-ads, RESTRICTED on microsoft-advertising"
+    (is (= :permitted (platform/category-disposition "chatgpt-ads" :travel-experiences)))
+    (is (= :restricted (platform/category-disposition "microsoft-advertising" :travel-experiences))))
+  (testing "political: prohibited outright on chatgpt-ads AND microsoft-advertising, merely restricted on google-ads and meta-ads"
+    (is (= :prohibited (platform/category-disposition "chatgpt-ads" :political)))
+    (is (= :prohibited (platform/category-disposition "microsoft-advertising" :political)))
+    (is (= :restricted (platform/category-disposition "google-ads" :political)))
+    (is (= :restricted (platform/category-disposition "meta-ads" :political))))
+  (testing "legal services: prohibited on chatgpt-ads, restricted on microsoft-advertising, unnamed (permitted) on the other two"
+    (is (= :prohibited (platform/category-disposition "chatgpt-ads" :legal-services)))
+    (is (= :restricted (platform/category-disposition "microsoft-advertising" :legal-services)))
+    (is (= :permitted (platform/category-disposition "google-ads" :legal-services)))
+    (is (= :permitted (platform/category-disposition "meta-ads" :legal-services)))))
+
+(deftest cross-platform-disposition-answers-where-can-this-run
+  (is (= {"chatgpt-ads" :not-permitted
+          "google-ads" :permitted
+          "meta-ads" :restricted
+          "microsoft-advertising" :restricted}
+         (into {} (platform/cross-platform-disposition :beauty-cosmetics))))
+  (testing "a category the OPEN sets do not name resolves permitted there, and is held on the CLOSED one"
+    (is (= {"chatgpt-ads" :not-permitted
+            "google-ads" :permitted
+            "meta-ads" :permitted
+            "microsoft-advertising" :restricted}
+           (into {} (platform/cross-platform-disposition :ticket-reselling)))
+        "ticket reselling: unnamed by Google and Meta, restricted by Microsoft, and outside ChatGPT's launch list")))
+
+(deftest open-and-closed-category-sets-behave-differently
+  (testing "an unnamed category is permitted on an open set and held on a closed one"
+    (is (= :permitted (platform/category-disposition "google-ads" :local-services))
+        "google-ads does not name :local-services, and does not declare unnamed categories disallowed")
+    (is (= :permitted (platform/category-disposition "chatgpt-ads" :local-services))
+        "chatgpt-ads names it explicitly")
+    (is (= :not-permitted (platform/category-disposition "chatgpt-ads" :food-products))
+        "chatgpt-ads declares every unnamed category disallowed")
+    (is (= :restricted (platform/category-disposition "microsoft-advertising" :food-products)))))
 
 ;; ----------------------------- unknown platform is inert -----------------------------
 
@@ -86,6 +142,46 @@
   (is (true? (platform/restricted-category-allowed-jurisdiction? "chatgpt-ads" "USA")))
   (is (false? (platform/restricted-category-allowed-jurisdiction? "chatgpt-ads" "JPN"))
       "the policy states non-US financial/healthcare ads are prohibited as a rule"))
+
+(deftest an-untranscribed-country-table-holds-everywhere
+  (testing ":per-category-unenumerated means 'this entry cannot say', and cannot-say is a hold -- never a quiet yes"
+    (doseq [pid ["google-ads" "meta-ads" "microsoft-advertising"]]
+      (testing pid
+        (is (= :per-category-unenumerated
+               (:restricted-category-jurisdictions (platform/policy-basis pid))))
+        (doseq [iso3 ["USA" "JPN" "GBR" "DEU"]]
+          (is (false? (platform/restricted-category-allowed-jurisdiction? pid iso3))
+              (str pid " must hold restricted categories in " iso3
+                   " until its per-category country table is transcribed")))))))
+
+;; ----------------------------- jurisdiction-scoped attestations -----------------------------
+
+(deftest jurisdiction-scoped-attestations-apply-only-where-they-apply
+  (testing "Meta's EU DSA beneficiary/payer disclosure is required in DEU and not in JPN"
+    (is (contains? (set (platform/required-attestations "meta-ads" "DEU"))
+                   :eu-dsa-beneficiary-payer-disclosure))
+    (is (not (contains? (set (platform/required-attestations "meta-ads" "JPN"))
+                        :eu-dsa-beneficiary-payer-disclosure))
+        "a JPN-only campaign must not be held for an EU-only requirement"))
+  (testing "the base attestations apply in both"
+    (is (contains? (set (platform/required-attestations "meta-ads" "JPN"))
+                   :landing-page-consistency))))
+
+(deftest jurisdiction-scoped-attestation-is-actually-missing-in-deu
+  (let [attested {:landing-page-consistency true :advertiser-identity-verified true}]
+    (is (= [:eu-dsa-beneficiary-payer-disclosure]
+           (platform/missing-attestations "meta-ads" "DEU" attested)))
+    (is (= [] (platform/missing-attestations "meta-ads" "JPN" attested)))))
+
+(deftest generative-attestation-follows-the-surface-not-the-fleet
+  (testing "only the generative-surface platform requires ad/answer distinguishability"
+    (is (contains? (set (platform/required-attestations "chatgpt-ads"))
+                   :distinguishable-from-product-ui))
+    (doseq [pid ["google-ads" "meta-ads" "microsoft-advertising"]]
+      (is (false? (platform/generative-surface? pid)))
+      (is (not (contains? (set (platform/required-attestations pid))
+                          :distinguishable-from-product-ui))
+          (str pid " is not a generative surface and must not inherit the attestation")))))
 
 ;; ----------------------------- attestations -----------------------------
 

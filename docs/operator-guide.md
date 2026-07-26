@@ -39,6 +39,26 @@ actually transcribed, and re-reading a policy whose `:read-on` has gone stale
 is a scheduled operator task — ad policies change (the seeded ChatGPT entry
 carries its own changelog: v1.0 in 2026-03, v1.3 by 2026-07).
 
+## Why your restricted-category campaigns are all holding
+
+Four platforms ship transcribed (ADR-0003), but only `chatgpt-ads` has its
+restricted-category country eligibility recorded. Google, Meta and Microsoft
+all limit restricted categories by country on per-category sub-pages that were
+not read, so their entries carry
+`:restricted-category-jurisdictions :per-category-unenumerated` and **every
+restricted-category placement on them HARD-holds**, in every jurisdiction.
+
+This is deliberate: the catalog cannot say whether your country is eligible,
+and "cannot say" is a hold. To clear it, read the relevant per-category policy
+sub-page for the category you are buying, replace the sentinel with the actual
+ISO3 set, and record the URL and read date. Do not relax the predicate.
+
+Note also that all four platforms keep open-ended reserve clauses (Google's
+「その他の制限付きビジネス」, Microsoft's "Areas of Questionable Legality" and
+"Other Market Restricted Products and Services"). These are not enumerable, so
+**a clean verdict from this actor is a necessary and not a sufficient condition
+for platform approval** — the platform's own review still decides.
+
 ## Minimum Production Controls
 
 - spec-basis citation required before any customer-facing determination

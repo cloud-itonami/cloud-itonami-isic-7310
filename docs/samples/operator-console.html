@@ -2469,6 +2469,9 @@ img,svg { max-width: 100%; height: auto; }</style></head><body>
 <h2>Campaign directory (post-scenario)</h2>
 <table><thead><tr><th>id</th><th>client</th><th>jurisdiction</th><th>proposed media spend</th><th>authorized budget</th><th>misleading-claim risk</th><th>placement</th><th>latest ledger status</th></tr></thead><tbody>
 <tr><td><code>campaign-1</code></td><td>Sato Bakery</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="ok">placed (JPN-PLC-000000)</td><td class="err">governor-hold: already-placed</td></tr>
+<tr><td><code>campaign-10</code></td><td>Ishikawa Dental</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="ok">committed</td></tr>
+<tr><td><code>campaign-11</code></td><td>Berliner Möbelhaus</td><td>DEU</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: platform-attestation-missing</td></tr>
+<tr><td><code>campaign-12</code></td><td>Hokkaido Onsen Tours</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: platform-restricted-category-unapproved</td></tr>
 <tr><td><code>campaign-2</code></td><td>Atlantis Goods</td><td>ATL</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: no-spec-basis</td></tr>
 <tr><td><code>campaign-3</code></td><td>鈴木工務店</td><td>JPN</td><td>900000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: media-spend-exceeds-authorized-budget</td></tr>
 <tr><td><code>campaign-4</code></td><td>田中青果</td><td>JPN</td><td>500000</td><td>800000</td><td class="err">unresolved</td><td class="muted">not placed</td><td class="err">governor-hold: misleading-claim-risk-unresolved</td></tr>
@@ -2503,8 +2506,11 @@ img,svg { max-width: 100%; height: auto; }</style></head><body>
 <tr><td>14</td><td><code>verify</code></td><td><code>campaign-7</code></td><td>op-1</td><td class="err">hold</td><td>platform-restricted-category-unapproved</td><td>0.9</td></tr>
 <tr><td>15</td><td><code>verify</code></td><td><code>campaign-8</code></td><td>op-1</td><td class="err">hold</td><td>platform-attestation-missing</td><td>0.9</td></tr>
 <tr><td>16</td><td><code>verify</code></td><td><code>campaign-9</code></td><td>op-1</td><td class="err">hold</td><td>sensitive-placement-context</td><td>0.9</td></tr>
-<tr><td>17</td><td><code>verify</code></td><td><code>campaign-6</code></td><td>op-1</td><td class="ok">commit</td><td>不当景品類及び不当表示防止法 (Act against Unjustifiable Premiums and Misleading Representations, 景品表示法), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
-<tr><td>18</td><td><code>place-campaign</code></td><td><code>campaign-6</code></td><td>op-1</td><td class="err">hold</td><td>platform-check-incomplete, platform-prohibited-category</td><td>0.9</td></tr>
+<tr><td>17</td><td><code>verify</code></td><td><code>campaign-10</code></td><td>op-1</td><td class="ok">commit</td><td>Google 広告のポリシー (Google Ads policies), https://support.google.com/adspolicy/answer/6008942</td><td><span class="muted">--</span></td></tr>
+<tr><td>18</td><td><code>verify</code></td><td><code>campaign-11</code></td><td>op-1</td><td class="err">hold</td><td>platform-attestation-missing</td><td>0.9</td></tr>
+<tr><td>19</td><td><code>verify</code></td><td><code>campaign-12</code></td><td>op-1</td><td class="err">hold</td><td>platform-restricted-category-unapproved</td><td>0.9</td></tr>
+<tr><td>20</td><td><code>verify</code></td><td><code>campaign-6</code></td><td>op-1</td><td class="ok">commit</td><td>不当景品類及び不当表示防止法 (Act against Unjustifiable Premiums and Misleading Representations, 景品表示法), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
+<tr><td>21</td><td><code>place-campaign</code></td><td><code>campaign-6</code></td><td>op-1</td><td class="err">hold</td><td>platform-check-incomplete, platform-prohibited-category</td><td>0.9</td></tr>
 </tbody></table>
 <h2>Draft campaign-placement records (advertising.registry, unsigned)</h2>
 <table><thead><tr><th>record_id</th><th>campaign_id</th><th>jurisdiction</th><th>kind</th></tr></thead><tbody>

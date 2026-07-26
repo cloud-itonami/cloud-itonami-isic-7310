@@ -28,6 +28,7 @@
   a human at all, and prints the audit ledger + the draft placement
   records."
   (:require [langgraph.graph :as g]
+            [advertising.platform :as platform]
             [advertising.store :as store]
             [advertising.operation :as op]))
 
@@ -97,6 +98,21 @@
 
     (println "== platform/verify campaign-9 (placement requested against an excluded context -> HARD hold) ==")
     (println (exec! actor "t14" {:op :platform/verify :subject "campaign-9"} operator))
+
+    ;; ---- the four platforms disagree (ADR-0003) ----
+    (println "== cross-platform disposition, one category at a time ==")
+    (doseq [c [:local-services :travel-experiences :legal-services :political :ticket-reselling]]
+      (println c "->" (platform/cross-platform-disposition c)))
+
+    (println "== platform/verify campaign-10 (google-ads, :local-services unnamed on an OPEN set -> clean, escalates) ==")
+    (println (exec! actor "t15" {:op :platform/verify :subject "campaign-10"} operator))
+    (println (approve! actor "t15"))
+
+    (println "== platform/verify campaign-11 (meta-ads in DEU, EU DSA beneficiary/payer disclosure not attested -> HARD hold) ==")
+    (println (exec! actor "t16" {:op :platform/verify :subject "campaign-11"} operator))
+
+    (println "== platform/verify campaign-12 (microsoft-advertising, :travel-experiences RESTRICTED there but permitted on chatgpt-ads -> HARD hold) ==")
+    (println (exec! actor "t17" {:op :platform/verify :subject "campaign-12"} operator))
 
     (println "== audit ledger ==")
     (doseq [f (store/ledger db)] (println f))

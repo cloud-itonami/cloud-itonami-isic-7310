@@ -22,18 +22,25 @@
       (is (= 900000 (:proposed-media-spend (store/campaign s "campaign-3"))))
       (is (true? (:misleading-claim-risk-unresolved? (store/campaign s "campaign-4"))))
       (is (false? (:campaign-placed? (store/campaign s "campaign-1"))))
-      (is (= ["campaign-1" "campaign-2" "campaign-3" "campaign-4"
+      (is (= ["campaign-1" "campaign-10" "campaign-11" "campaign-12"
+              "campaign-2" "campaign-3" "campaign-4"
               "campaign-5" "campaign-6" "campaign-7" "campaign-8" "campaign-9"]
-             (mapv :id (store/all-campaigns s))))
+             (mapv :id (store/all-campaigns s)))
+          "sorted by :id as strings, so campaign-10 sorts between campaign-1 and campaign-2")
       (testing "media-platform facts round-trip on both backends (ADR-0002)"
         (is (= "chatgpt-ads" (:target-platform (store/campaign s "campaign-1"))))
         (is (= :local-services (:ad-category (store/campaign s "campaign-1"))))
         (is (false? (:advertiser-approval-on-file? (store/campaign s "campaign-1"))))
         (is (= {:distinguishable-from-product-ui true
                 :landing-page-consistency true
-                :advertiser-identity-verified true}
+                :advertiser-identity-verified true
+                :editorial-standards true}
                (:attestations (store/campaign s "campaign-1")))
             "compound attestation map survives the EDN-blob codec")
+        (is (= "google-ads" (:target-platform (store/campaign s "campaign-10"))))
+        (is (= "meta-ads" (:target-platform (store/campaign s "campaign-11"))))
+        (is (= "DEU" (:jurisdiction (store/campaign s "campaign-11"))))
+        (is (= "microsoft-advertising" (:target-platform (store/campaign s "campaign-12"))))
         (is (= [:mental-and-personal-health]
                (:requested-placement-contexts (store/campaign s "campaign-9")))
             "compound context vector survives the EDN-blob codec")

@@ -111,6 +111,25 @@
     ;; to serve ads near -> HARD hold, :sensitive-placement-context.
     (exec! actor "t14" {:op :platform/verify :subject "campaign-9"})
 
+    ;; ---- the four seeded platforms disagree (ADR-0003) ----
+
+    ;; campaign-10: google-ads, :local-services -- same category and
+    ;; jurisdiction as campaign-1, different platform, and still clean
+    ;; because Google's category set is OPEN. Escalates, approved.
+    (exec! actor "t18" {:op :platform/verify :subject "campaign-10"})
+    (approve! actor "t18")
+
+    ;; campaign-11: meta-ads in DEU -- the EU DSA beneficiary/payer disclosure
+    ;; applies there and was never attested -> HARD hold,
+    ;; :platform-attestation-missing. The same facts in JPN would pass.
+    (exec! actor "t19" {:op :platform/verify :subject "campaign-11"})
+
+    ;; campaign-12: microsoft-advertising, :travel-experiences -- RESTRICTED
+    ;; there while PERMITTED on chatgpt-ads, and the per-category country
+    ;; table is untranscribed -> HARD hold,
+    ;; :platform-restricted-category-unapproved.
+    (exec! actor "t20" {:op :platform/verify :subject "campaign-12"})
+
     ;; campaign-6: jurisdiction evidence cleared, then placement attempted.
     ;; TWO platform-side rules accumulate in one decision --
     ;; :platform-check-incomplete (no conformance assessment on file, because
