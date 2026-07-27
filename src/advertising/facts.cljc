@@ -61,7 +61,35 @@
           :required-evidence ["Kundenbriefingprotokoll (client-brief-record)"
                               "Medienplanprotokoll (media-plan-record)"
                               "Kreativfreigabeprotokoll (creative-approval-record)"
-                              "Budgetfreigabeprotokoll (budget-authorization-record)"]}})
+                              "Budgetfreigabeprotokoll (budget-authorization-record)"]}
+   ;; Unlike GBR/DEU, where an industry self-regulatory body (ASA/CAP,
+   ;; Werberat) is the primary standard-setter, China's advertising
+   ;; framework is primarily STATUTORY and enforced by a regulator, so
+   ;; `:owner-authority` names SAMR rather than a trade association.
+   ;; 中国广告协会 (CAA) does publish self-regulatory codes, but no official
+   ;; CAA source was fetched and read for this entry, so it is not cited
+   ;; here -- add it when someone actually reads one.
+   "CHN" {:name "People's Republic of China"
+          :owner-authority "国家市场监督管理总局 (State Administration for Market Regulation, SAMR)"
+          :legal-basis "中华人民共和国广告法 (Advertising Law of the PRC, 2021-04-29 第二次修正) / 互联网广告管理办法 (SAMR Decree No. 72, in force 2023-05-01)"
+          :national-spec "广告可识别性 (广告法第十四条)・虚假广告禁止 (第二十八条)・广告代言人义务 (第三十八条)・发布前广告审查 (第四十六条)・互联网广告の显著标明と一键关闭 (办法第九条・第十条)"
+          :provenance "https://www.samr.gov.cn/zw/zfxxgk/fdzdgknr/fgs/art/2023/art_5474cf75173c45d6a0379730fb4e8d97.html"
+          :retrieved-at "2026-07-27"
+          :required-evidence ["客户委托记录 (client-brief-record)"
+                              "媒介投放计划记录 (media-plan-record)"
+                              "广告内容审核记录 (creative-approval-record)"
+                              "媒介投放授权记录 (budget-authorization-record)"]
+          ;; This actor screens misleading claims and media placement. It
+          ;; does NOT model China's pre-publication review gate
+          ;; (广告法第四十六条's 广告批准文号 for
+          ;; 医疗/药品/医疗器械/农药/兽药/保健食品/特殊医学用途配方食品) --
+          ;; that is a conditional, category-dependent HARD gate with its
+          ;; own validity window, which a catalog row cannot express.
+          ;; `cloud-itonami-iso3166-chn-advertising` implements it.
+          ;; Naming the boundary here so a CHN campaign is not mistaken
+          ;; for fully screened by this actor alone.
+          :out-of-scope-here [:pre-publication-ad-review]
+          :out-of-scope-note "发布前广告审查 (广告批准文号) は本 actor では判定しない — cloud-itonami-iso3166-chn-advertising を参照"}})
 
 (defn spec-basis
   "The jurisdiction's requirement map, or nil -- nil means NO spec-basis,
