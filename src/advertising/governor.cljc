@@ -187,7 +187,17 @@
   [{:keys [op subject]} st]
   (when (= op :actuation/place-campaign)
     (let [c (store/campaign st subject)]
-      (when (registry/media-spend-exceeds-authorized-budget? c)
+      (cond
+        ;; Either figure missing or non-numeric: the limit cannot be
+        ;; evaluated, so it is not "within limits". This used to fall
+        ;; through as "not over" and proceed.
+        ;; Only when the entity EXISTS: a missing entity is a different
+        ;; violation that another gate owns, and firing here would mask it.
+        (and c (not (registry/media-spend-exceeds-authorized-budget-checkable? c)))
+        [{:rule :media-spend-exceeds-authorized-budget
+          :detail "上限判定に必要な値が記録されていない -- 限度内と断定できないため進めない"}]
+
+        (registry/media-spend-exceeds-authorized-budget? c)
         [{:rule :media-spend-exceeds-authorized-budget
           :detail (str subject " の提案媒体費(" (:proposed-media-spend c)
                       ")が承認予算(" (:authorized-budget c) ")を超過")}]))))
