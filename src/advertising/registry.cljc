@@ -58,6 +58,17 @@
   (and (number? proposed-media-spend) (number? authorized-budget)
        (> proposed-media-spend authorized-budget)))
 
+(defn media-spend-exceeds-authorized-budget-checkable?
+  "Are both sides of `media-spend-exceeds-authorized-budget?` actually recorded?
+
+  That predicate answers only `over` / `not over`, and its
+  `(and (number? ...) (number? ...) ...)` guard made every un-recorded
+  case fall through as `not over` -- an entity missing either figure
+  passed the limit check silently. Callers must ask this first:
+  un-checkable is not within limits."
+  [{:keys [proposed-media-spend authorized-budget]}]
+  (boolean (and (number? proposed-media-spend) (number? authorized-budget))))
+
 (defn register-campaign-placement
   "Validate + construct the CAMPAIGN-PLACEMENT registration DRAFT --
   the agency's own act of placing/publishing a real campaign on the
