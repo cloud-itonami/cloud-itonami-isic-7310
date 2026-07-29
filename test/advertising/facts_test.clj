@@ -73,3 +73,14 @@
   (let [report (facts/coverage ["JPN" "ATL"])]
     (is (= 1 (:disclosure-covered report)))
     (is (= ["ATL"] (:missing-jurisdictions report)))))
+
+(deftest a-recorded-label-is-matched-on-its-content-not-its-whitespace
+  (testing "the function already trims to decide whether a label is blank; matching the untrimmed string against the published set contradicts that, and rejects a label the operator did record"
+    (is (facts/disclosure-acceptable? "JPN" " PR "))
+    (is (facts/disclosure-acceptable? "JPN" "PR\n"))
+    (is (facts/disclosure-acceptable? "USA" "  #ad")))
+  (testing "trimming only -- case is NOT folded, because a wording an authority did not publish in that form is not a wording it published"
+    (is (not (facts/disclosure-acceptable? "USA" "AD")))
+    (is (not (facts/disclosure-acceptable? "DEU" "werbung")))
+    (is (not (facts/disclosure-acceptable? "JPN" " タイアップ "))
+        "trimming must not turn a non-published wording into a published one")))

@@ -224,9 +224,9 @@ clojure -M:dev:coverage  # cloverage over src, driven by the same suite
 clojure -M:lint          # clj-kondo (errors fail; CI mirrors this)
 ```
 
-89 tests / 510 assertions, 0 failures.
+92 tests / 523 assertions, 0 failures.
 
-Coverage: 97.64% forms / 99.03% lines, measured by `clojure -M:dev:coverage`
+Coverage: 97.67% forms / 99.03% lines, measured by `clojure -M:dev:coverage`
 with **nothing excluded** — not an estimate, and not a subset chosen to
 flatter the number. Every namespace, including both `-main` drivers, is
 at or above 95%.

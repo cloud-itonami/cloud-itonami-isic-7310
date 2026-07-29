@@ -211,8 +211,18 @@
   "Is `label` one of the disclosure wordings `iso3`'s own authority
   publishes? A missing disclosure basis, or a blank/absent label, is
   NEVER acceptable -- the governor holds rather than guessing whether
-  an unrecorded wording would satisfy a regulator."
+  an unrecorded wording would satisfy a regulator.
+
+  The recorded label is TRIMMED before matching, and only trimmed.
+  Trimming is safe because surrounding whitespace carries no meaning --
+  an operator who recorded 「 PR 」 with stray spaces recorded PR, and
+  holding on it would be a false hold on a label they did record. Case is
+  deliberately NOT folded: a wording an authority did not publish in
+  that form is not a wording it published, and case-folding across
+  Japanese, German and English published examples would quietly widen
+  a trust boundary this function exists to keep narrow."
   [iso3 label]
-  (boolean (and label
-                (not= "" (str/trim (str label)))
-                (contains? (set (accepted-disclosure-labels iso3)) label))))
+  (let [trimmed (some-> label str str/trim)]
+    (boolean (and trimmed
+                  (not= "" trimmed)
+                  (contains? (set (accepted-disclosure-labels iso3)) trimmed)))))

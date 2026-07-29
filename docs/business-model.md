@@ -60,6 +60,10 @@
   file at all: a committed verdict that actually clears is required, because
   "we never looked" carries the same exposure as "we looked and found
   something" with no record that anyone looked
+- a spend ceiling that CANNOT be computed -- because an amount is recorded as
+  something that is not a number -- forces a hold rather than reporting the
+  campaign clean: a limit nobody could verify must never read as a limit that
+  was respected
 
 ## Campaign Governor: decision rule
 

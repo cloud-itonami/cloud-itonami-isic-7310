@@ -62,15 +62,37 @@
   (let [s (str n)]
     (str (apply str (repeat (max 0 (- w (count s))) "0")) s)))
 
+(defn- uncomputable-amounts?
+  "Does `campaign` record any of `ks` as a non-nil NON-number?
+
+  nil means 'not recorded', which every ceiling in this family already
+  has a documented answer for. A non-nil non-number is different: it is
+  corrupt data, and a ceiling check that cannot be computed must not
+  report the campaign clean. Coercing such a value away (to 0, or by
+  failing a `number?` guard into `false`) makes the ceiling MORE
+  lenient -- the one direction a ceiling check must never fail in,
+  because the result is a real-world act committed against a limit
+  nobody actually verified.
+
+  So the family answers `true` (hold) on corrupt input. The governor
+  reports the ceiling rule with the offending value in its detail
+  string, which is what an operator needs in order to go fix the
+  record."
+  [campaign ks]
+  (boolean (some #(let [v (get campaign %)]
+                    (and (some? v) (not (number? v))))
+                 ks)))
+
 (defn media-spend-exceeds-authorized-budget?
   "Does `campaign`'s own `:proposed-media-spend` exceed its own
   recorded `:authorized-budget`? A pure ground-truth check against the
   campaign's own permanent fields -- no upstream comparison needed.
   The SEVENTH instance of this fleet's MAXIMUM-ceiling check family
   (see ns docstring)."
-  [{:keys [proposed-media-spend authorized-budget]}]
-  (and (number? proposed-media-spend) (number? authorized-budget)
-       (> proposed-media-spend authorized-budget)))
+  [{:keys [proposed-media-spend authorized-budget] :as campaign}]
+  (or (uncomputable-amounts? campaign [:proposed-media-spend :authorized-budget])
+      (and (number? proposed-media-spend) (number? authorized-budget)
+           (> proposed-media-spend authorized-budget))))
 
 (defn creator-tieup-fee-exceeds-authorized-budget?
   "Does `campaign`'s own `:proposed-media-spend` PLUS its own
@@ -84,12 +106,15 @@
   spend the client never authorized.
 
   A campaign with no `:creator-tieup-fee` recorded cannot exceed
-  anything -- this returns false rather than guessing a fee."
-  [{:keys [proposed-media-spend creator-tieup-fee authorized-budget]}]
-  (and (number? creator-tieup-fee) (number? authorized-budget)
-       (> (+ (if (number? proposed-media-spend) proposed-media-spend 0)
-             creator-tieup-fee)
-          authorized-budget)))
+  anything -- this returns false rather than guessing a fee. A campaign
+  that records one as a NON-number is a different case entirely, and
+  answers true -- see `uncomputable-amounts?`."
+  [{:keys [proposed-media-spend creator-tieup-fee authorized-budget] :as campaign}]
+  (or (uncomputable-amounts? campaign [:proposed-media-spend :creator-tieup-fee :authorized-budget])
+      (and (number? creator-tieup-fee) (number? authorized-budget)
+           (> (+ (if (number? proposed-media-spend) proposed-media-spend 0)
+                 creator-tieup-fee)
+              authorized-budget))))
 
 (defn disclosure-label-missing?
   "Has `campaign` failed to record ANY sponsorship-disclosure label for

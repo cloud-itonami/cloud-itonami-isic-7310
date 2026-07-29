@@ -111,3 +111,26 @@
     (is (= 2 (count hist2)))
     (is (= "JPN-PLC-000000" (get-in hist2 [0 "record_id"])))
     (is (= "JPN-PLC-000001" (get-in hist2 [1 "record_id"])))))
+
+;; ----------------------------- corrupt amounts must not read as clean -----------------------------
+
+(deftest a-ceiling-that-cannot-be-computed-must-not-report-clean
+  (testing "an amount that is recorded but is NOT a number is corrupt data, not an absent field. Coercing it away makes the ceiling MORE lenient, which is the one direction a ceiling check must never fail in."
+    (is (r/creator-tieup-fee-exceeds-authorized-budget?
+         {:proposed-media-spend "500000" :creator-tieup-fee 400000 :authorized-budget 800000})
+        "a string media spend must not be silently treated as 0")
+    (is (r/creator-tieup-fee-exceeds-authorized-budget?
+         {:proposed-media-spend 500000 :creator-tieup-fee "400000" :authorized-budget 800000}))
+    (is (r/creator-tieup-fee-exceeds-authorized-budget?
+         {:proposed-media-spend 500000 :creator-tieup-fee 400000 :authorized-budget "800000"}))
+    (is (r/media-spend-exceeds-authorized-budget?
+         {:proposed-media-spend "900000" :authorized-budget 800000})
+        "the same rule for the sibling ceiling in the family")))
+
+(deftest an-absent-amount-is-still-not-corrupt
+  (testing "nil means 'not recorded' and keeps the documented behaviour -- only a non-nil non-number is corrupt"
+    (is (not (r/creator-tieup-fee-exceeds-authorized-budget?
+              {:creator-tieup-fee 100000 :authorized-budget 800000}))
+        "a tie-up on a campaign with no media plan yet computes fine")
+    (is (not (r/media-spend-exceeds-authorized-budget? {})))
+    (is (not (r/creator-tieup-fee-exceeds-authorized-budget? {})))))
