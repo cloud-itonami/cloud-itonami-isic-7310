@@ -88,17 +88,22 @@ here it is **AdOps-LLM ⊣ Campaign Governor**.
 ## Scope: what this actor does and does not do
 
 This actor covers campaign intake through advertising-standards
-evidence assessment, misleading-claim-risk screening and campaign
-placement, plus the creator-tie-up lifecycle -- creator-eligibility
-screening, per-jurisdiction tie-up evidence assessment and the tie-up
-order itself. It does **not**, by itself, hold any professional
-license required to operate as an advertising agency in a given
-jurisdiction, and it does not claim to. It also does **not** create
-the creative work itself, or judge the artistic/strategic merit of a
-campaign -- `advertising.registry/media-spend-exceeds-authorized-
-budget?` and `advertising.registry/creator-tieup-fee-exceeds-
-authorized-budget?` are pure ceiling recomputes against the campaign's
-own recorded fields, not creative or strategic assessments.
+evidence assessment, media-platform ad-policy conformance,
+misleading-claim-risk screening and campaign placement, plus the
+creator-tie-up lifecycle -- creator-eligibility screening,
+per-jurisdiction tie-up evidence assessment and the tie-up order
+itself. It does **not** integrate with any real ad platform's buying
+API -- it governs the DECISION to place a campaign, not the mechanics
+of placing it, so `:actuation/place-campaign` drafts a placement
+RECORD an agency would keep rather than calling a media network. It
+does **not**, by itself, hold any professional license required to
+operate as an advertising agency in a given jurisdiction, and it does
+not claim to. It also does **not** create the creative work itself, or
+judge the artistic/strategic merit of a campaign --
+`advertising.registry/media-spend-exceeds-authorized-budget?` and
+`advertising.registry/creator-tieup-fee-exceeds-authorized-budget?`
+are pure ceiling recomputes against the campaign's own recorded
+fields, not creative or strategic assessments.
 
 For creator tie-ups specifically, it does **not** talk to YouTube,
 Instagram, TikTok or X: there is no API call, no order sent to a
@@ -148,7 +153,7 @@ booleans (`:campaign-placed?` / `:tieup-ordered?`), separate
 jurisdiction-scoped sequences (`JPN-PLC-000000` / `JPN-TIE-000000`)
 and separate histories. A campaign that has been placed has **not**
 thereby been ordered from a creator, and holding one must never mask
-the other (see ADR-0002 and
+the other (see ADR-0004 and
 `the-two-actuation-guards-are-independent`).
 
 ## The core contract
@@ -214,24 +219,69 @@ among the 消費者庁's published examples (「広告」「宣伝」「プロ�
 「PR」), and a governor that accepted it because it *sounds* like a
 disclosure would be worse than useless. See
 `tieup-with-unpublished-disclosure-label-is-held`.
+campaign intake
+   + jurisdiction facts (advertising.facts,   spec-cited)
+   + media-platform facts (advertising.platform, policy-cited)
+        |
+        v
+   ┌──────────────┐   proposal    ┌──────────────────────────────────┐
+   │ AdOps-LLM    │ ───────────▶  │ Campaign Governor                │ (independent
+   │ (sealed)     │  + citations  │                                  │  system)
+   └──────────────┘               │ jurisdiction side:               │
+          │               commit ◀┤   spec-basis · evidence-         │
+          │                       │   incomplete · media-spend-      │
+    record + ledger               │   exceeds-authorized-budget      │
+          │                       │   (ceiling) · misleading-claim-  │
+          │             escalate ◀┤   risk-unresolved (uncond.) ·    │
+          │        (ALWAYS for    │   already-placed                 │
+          │         :actuation/   │                                  │
+          │         place-        │ media-platform side (ADR-0002):  │
+          ▼         campaign)     │   no-platform-policy-basis ·     │
+    human approval                │   platform-check-incomplete ·    │
+                                  │   platform-prohibited-category · │
+                                  │   platform-restricted-category-  │
+                                  │   unapproved · platform-         │
+                                  │   attestation-missing ·          │
+                                  │   sensitive-placement-context    │
+                                  └──────────────────────────────────┘
+```
+
+**The AdOps-LLM never places a campaign the Campaign Governor would
+reject, and never does so without a human sign-off.** Hard violations
+(fabricated regulatory requirements; unsupported evidence; a media
+spend past its own authorized budget; an unresolved misleading-claim
+risk; a double placement; a media platform whose ad policy nobody has
+read; an ad category that platform itself refuses; a generative
+surface where ad/answer distinguishability was never attested) force
+**hold** and *cannot* be approved past; a clean placement proposal
+still always routes to a human.
+
+**The two check families are independent authorities and neither
+subsumes the other.** A campaign can be perfectly lawful under 景表法
+or the FTC Act and still be categorically disallowed on the platform
+it was bought on; it can equally satisfy every platform policy and
+still be unlawful where it runs. So both families run on every
+`:actuation/place-campaign`, and clearing one clears nothing about the
+other.
 
 ## Run
 
 ```bash
-clojure -M:dev:run       # walk both clean actuation lifecycles + eight HARD-hold cases through the actor
-clojure -M:dev:test      # governor contract · phase invariants · store parity · registry conformance · facts coverage · advisor boundary
+clojure -M:dev:run       # walk both clean actuation lifecycles + every HARD-hold rule through the actor
+clojure -M:dev:test      # governor contract · phase invariants · store parity · registry conformance · facts + platform coverage · advisor boundary · drivers
 clojure -M:dev:coverage  # cloverage over src, driven by the same suite
 clojure -M:lint          # clj-kondo (errors fail; CI mirrors this)
 ```
 
-92 tests / 523 assertions, 0 failures.
+134 tests / 881 assertions, 0 failures.
 
-Coverage: 97.67% forms / 99.03% lines, measured by `clojure -M:dev:coverage`
+Coverage: 97.72% forms / 98.87% lines, measured by `clojure -M:dev:coverage`
 with **nothing excluded** — not an estimate, and not a subset chosen to
 flatter the number. Every namespace, including both `-main` drivers, is
-at or above 95%.
+at or above 96% on forms — the drivers included, because
+`drivers_test.clj` runs them rather than leaving them to a nightly cron.
 
-Three of the seven suites exist specifically to cover paths the main
+Three of the nine suites exist specifically to cover paths the main
 governor-contract suite drives straight past — each was written after
 measuring, because the measurement is what revealed they were missing:
 
@@ -298,11 +348,18 @@ acts on it afterwards.
 | `src/advertising/registry.cljc` | Campaign-placement and creator-tie-up-order draft records, plus `media-spend-exceeds-authorized-budget?` -- the SEVENTH instance of this fleet's MAXIMUM-ceiling check family (`facility`/`school`/`card`/`recovery`/`care`/`navigator` established the first six) -- and `creator-tieup-fee-exceeds-authorized-budget?`, the EIGHTH, and the first in the family to SUM two of the subject's own amounts before comparing |
 | `src/advertising/facts.cljc` | Per-jurisdiction advertising-standards catalog with an official spec-basis citation per entry, PLUS a separately-cited sponsorship-disclosure basis and published-label set per entry, honest coverage reporting for both |
 | `src/advertising/advertisingadvisor.cljc` | **AdOps-LLM** -- `mock-advisor` ‖ `llm-advisor`; intake/media-plan-verification/misleading-claim-risk-screening/campaign-placement proposals, plus creator-eligibility-screening/tie-up-brief/tie-up-order proposals. Never proposes a disclosure label -- it reports the recorded one verbatim, so the governor's published-label check cannot be defeated by a plausible invention |
-| `src/advertising/governor.cljc` | **Campaign Governor** -- 9 HARD checks (spec-basis · evidence-incomplete · media-spend-exceeds-authorized-budget, pure ground-truth ceiling recompute · misleading-claim-risk-unresolved, unconditional evaluation, the THIRTY-EIGHTH grounding of this discipline · risk-screen-missing · creator-ineligible, unconditional · tieup-evidence-incomplete · sponsorship-disclosure-missing, pure ground-truth recompute against the jurisdiction's own published labels, a genuinely new concept in this fleet · creator-screen-missing) + already-placed and already-ordered guards + 1 soft (confidence/actuation gate) |
+| `src/advertising/governor.cljc` | **Campaign Governor** -- 15 HARD checks (9 jurisdiction- and creator-side, 6 media-platform-side) (spec-basis · evidence-incomplete · media-spend-exceeds-authorized-budget, pure ground-truth ceiling recompute · misleading-claim-risk-unresolved, unconditional evaluation, the THIRTY-EIGHTH grounding of this discipline · risk-screen-missing · creator-ineligible, unconditional · tieup-evidence-incomplete · sponsorship-disclosure-missing, pure ground-truth recompute against the jurisdiction's own published labels, a genuinely new concept in this fleet · creator-screen-missing) + already-placed and already-ordered guards + 1 soft (confidence/actuation gate) |
 | `src/advertising/phase.cljc` | **Phase 0→3** -- read-only → assisted intake → assisted verify → supervised (BOTH actuations always human, enforced structurally via `actuation-ops`; campaign intake is the ONLY auto-eligible op, no direct capital risk) |
+| `src/advertising/store.cljc` | **Store** protocol -- `MemStore` ‖ `DatomicStore` (`langchain.db`) + append-only audit ledger + campaign-placement history. No dynamically-filed sub-record -- the actuation op acts directly on a pre-seeded campaign, and the double-actuation guard checks a dedicated `:campaign-placed?` boolean rather than a `:status` value |
+| `src/advertising/registry.cljc` | Campaign-placement draft records, plus `media-spend-exceeds-authorized-budget?` -- the SEVENTH instance of this fleet's MAXIMUM-ceiling check family (`facility`/`school`/`card`/`recovery`/`care`/`navigator` established the first six) |
+| `src/advertising/facts.cljc` | Per-jurisdiction advertising-standards catalog with an official spec-basis citation per entry, honest coverage reporting. **CHN carries an explicit `:out-of-scope-here`**: China's pre-publication review gate (广告法第四十六条's 广告批准文号) is a conditional, category-dependent HARD gate with its own validity window — a catalog row cannot express it, so [`cloud-itonami-iso3166-chn-advertising`](https://github.com/cloud-itonami/cloud-itonami-iso3166-chn-advertising) implements it and this row names the boundary rather than implying full coverage |
+| `src/advertising/platform.cljc` | Per-media-platform ad-policy catalog (ADR-0002 / ADR-0003) -- 4 platforms (`chatgpt-ads`, `google-ads`, `meta-ads`, `microsoft-advertising`) over one shared `category-vocabulary`; category taxonomy, open-vs-closed category sets, restricted-category jurisdictions, excluded placement contexts, base + jurisdiction-scoped attestations and `:generative-surface?`, each transcribed from a DIRECT read of the platform's own published policy with the URL, version and read date recorded; `cross-platform-disposition` + honest coverage reporting |
+| `src/advertising/advertisingadvisor.cljc` | **AdOps-LLM** -- `mock-advisor` ‖ `llm-advisor`; intake/media-plan-verification/media-platform-conformance/misleading-claim-risk-screening/campaign-placement proposals |
+| `src/advertising/governor.cljc` | **Campaign Governor** -- 4 jurisdiction-side HARD checks (spec-basis · evidence-incomplete · media-spend-exceeds-authorized-budget, pure ground-truth ceiling recompute · misleading-claim-risk-unresolved, unconditional evaluation, the THIRTY-EIGHTH grounding of this discipline, a genuinely new concept grounded in this blueprint's own Trust Control text) + already-placed guard + 6 media-platform-side HARD checks (ADR-0002) + 1 soft (confidence/actuation gate) |
+| `src/advertising/phase.cljc` | **Phase 0→3** -- read-only → assisted intake → assisted verify (media-plan + media-platform conformance) → supervised (campaign placement always human; campaign intake is the ONLY auto-eligible op, no direct capital risk) |
 | `src/advertising/operation.cljc` | **OperationActor** -- langgraph-clj StateGraph |
 | `src/advertising/sim.cljc` | demo driver |
-| `test/advertising/*_test.clj` | governor contract · phase invariants · store parity · registry conformance · facts coverage |
+| `test/advertising/*_test.clj` | governor contract · phase invariants · store parity · registry conformance · facts coverage · media-platform taxonomy + unknown-platform inertness |
 
 ## Business-process coverage (honest)
 
@@ -324,7 +381,7 @@ ordering -- the core governed lifecycles this blueprint's own
 
 **"We never looked" is not a clean state.** Both actuations HARD-require
 a committed screening verdict that actually clears -- `:resolved` for
-misleading-claim risk, `:eligible` for the creator. Until ADR-0003
+misleading-claim risk, `:eligible` for the creator. Until ADR-0005
 those checks only fired when a screening record existed AND reported a
 problem, so skipping the screening step entirely was the way through;
 four tests in this repo encoded that hole without anyone noticing. A
@@ -334,10 +391,13 @@ the placement is later disputed.
 
 A known R0 boundary that remains: the evidence checklists behind
 `:media-plan/verify` and `:tieup/verify` are still operator-submitted,
-so an operator can assert documents that do not exist. ADR-0003 makes
+so an operator can assert documents that do not exist. ADR-0005 makes
 the screening *verdicts* first-class governor inputs; it does not make
 the checklists self-proving. That needs per-document attestation
 records.
+| Media-platform ad-policy conformance against the target platform's OWN published policy -- category taxonomy, restricted-category advertiser approval + jurisdiction limits, excluded placement contexts, required attestations (`:platform/verify`, ADR-0002) | Real ad-platform API integration (bidding, creative upload, delivery reporting) -- this actor governs the DECISION to place, not the mechanics of placing |
+| Campaign placement, HARD-gated on full evidence, the campaign's own authorized-budget ceiling AND the target platform's own policy, plus a double-placement guard (`:actuation/place-campaign`) | |
+| Immutable audit ledger for every intake/verification/conformance/screening/placement decision, recording which media platform each placement ran on | |
 
 Extending coverage is additive: add the next gate (e.g. a creative-
 rights-clearance check, or the screening-verdict requirement above) as
@@ -371,19 +431,109 @@ publishes one. `disclosure-acceptable?` is therefore a **floor** (did
 the operator record a label the authority has itself named?), not a
 legal opinion that the resulting post is compliant.
 
+## Media-platform coverage (honest)
+
+`advertising.platform/coverage` reports how many requested media
+platforms actually have a transcribed ad policy in
+`advertising.platform/catalog`. **Four are seeded**, each transcribed
+from a direct read of the platform's own published policy:
+
+| platform | policy read | on |
+|---|---|---|
+| `chatgpt-ads` | [OpenAI 広告ポリシー](https://openai.com/policies/ad-policies/) (v1.3 / 更新 2026年7月15日) | 2026-07-26 |
+| `google-ads` | [Google 広告のポリシー](https://support.google.com/adspolicy/answer/6008942) | 2026-07-27 |
+| `meta-ads` | [Meta 広告規定](https://transparency.meta.com/policies/ad-standards/) | 2026-07-27 |
+| `microsoft-advertising` | [Disallowed Content](https://about.ads.microsoft.com/en-us/policies/disallowed-content) + [Restricted Content](https://about.ads.microsoft.com/en-us/policies/restricted-categories) | 2026-07-27 |
+
+**They disagree, and the catalog keeps them disagreeing** — that is the
+whole reason platforms are modelled separately instead of merged into
+one "advertising rules" table:
+
+| category | `chatgpt-ads` | `google-ads` | `meta-ads` | `microsoft-advertising` |
+|---|---|---|---|---|
+| `:travel-experiences` | permitted | permitted | permitted | **restricted** |
+| `:legal-services` | **prohibited** | permitted | permitted | restricted |
+| `:political` | prohibited | **restricted** | **restricted** | prohibited |
+| `:ticket-reselling` | **not-permitted** | permitted | permitted | restricted |
+
+`advertising.platform/cross-platform-disposition` answers this directly
+— the question an agency asks before it buys ("where can I run this at
+all?"). A campaign's `:ad-category` is drawn from one shared
+`category-vocabulary`, so the same declared category is what resolves
+differently, not a different word per platform.
+
+Two structural differences fall out of the transcription and are worth
+knowing before reading a verdict:
+
+- **Open vs closed category sets.** ChatGPT states that every category
+  it does not name is disallowed at launch, so an unnamed category
+  resolves `:not-permitted` there. The other three enumerate what is
+  prohibited and restricted without closing the set, so an unnamed
+  category resolves `:permitted`. This is transcribed per platform
+  (`:closed-category-set?`), not assumed.
+- **Untranscribed country tables hold.** Google, Meta and Microsoft all
+  limit restricted categories by country, but those tables live on
+  per-category sub-pages that were not read. Those entries record
+  `:restricted-category-jurisdictions :per-category-unenumerated`,
+  which makes `restricted-category-allowed-jurisdiction?` return
+  **false everywhere** — every restricted-category placement HARD-holds
+  until someone transcribes the relevant table. Not knowing is a hold,
+  never a quiet yes.
+
+Every entry's `:transcription-notes` states what it does **not**
+capture. Most importantly, all four platforms keep open-ended reserve
+clauses (Google's 「その他の制限付きビジネス」, Microsoft's "Areas of
+Questionable Legality" / "Other Market Restricted Products and
+Services") which are not enumerable — so **a clean verdict from this
+catalog is a necessary, not a sufficient, condition for platform
+approval.**
+
+Adding a platform is additive and cheap — read that platform's own
+published policy, transcribe its taxonomy, record the URL, the version
+the document states for itself, and the date you read it. Never seed a
+platform from memory, from a search-result summary, or by inferring one
+network's taxonomy from another's: an absent platform HARD-holds on
+`no-platform-policy-basis`, while an invented one waves campaigns
+through on made-up rules.
+
+### Why `:generative-surface?` is a first-class fact
+
+On a banner or search surface, "is this an ad?" is answered by layout:
+the ad sits in a slot users have learned to read as an ad. On a
+generative surface the assistant's own prose is the primary content,
+so an ad styled like that prose reads as the assistant's answer.
+ChatGPT's ad policy makes this a standalone prohibition
+(`インターフェースの模倣` — ads must be clearly distinguishable from
+the ChatGPT product experience, and ads mimicking the look, function
+or presentation of an OpenAI interface may be removed or required to
+change), which is the same consumer-protection principle behind the
+FTC's [native-advertising guidance](https://www.ftc.gov/business-guidance/resources/native-advertising-guide-businesses)
+(an ad should be identifiable as an ad). That is why
+`:distinguishable-from-product-ui` is a **required attestation** the
+agency must positively assert — absence is never treated as consent —
+and why an unattested campaign HARD-holds rather than passing
+creative review with a note.
+
 ## Maturity
 
 `:implemented` -- `AdOps-LLM` + `Campaign Governor` run as real,
 tested code (see `Run` above), promoted from the originally-published
 `:blueprint`-tier design, modeled closely on the fifty-three prior
 actors' architecture. See `docs/adr/0001-architecture.md` for the
-history and design, and
-[`docs/adr/0002-creator-tieup.md`](docs/adr/0002-creator-tieup.md) for
+history and design, `docs/adr/0002-media-platform-layer.md` for the
+media-platform layer (`advertising.platform`, `:platform/verify` and
+the six platform-side governor checks),
+`docs/adr/0003-multi-platform-catalog.md` for the expansion to four
+platforms, the shared category vocabulary and jurisdiction-scoped
+attestations,
+[`docs/adr/0004-creator-tieup.md`](docs/adr/0004-creator-tieup.md) for
 the creator-tie-up (YouTube / influencer) lifecycle -- why it became a
 second actuation on this actor rather than a new repository, and why
 sponsorship disclosure is a governor check rather than an advisor
-responsibility. [`docs/adr/0003-screening-must-be-on-file.md`](docs/adr/0003-screening-must-be-on-file.md)
-closes the boundary ADR-0002 left open, on both lifecycles at once.
+responsibility -- and
+[`docs/adr/0005-screening-must-be-on-file.md`](docs/adr/0005-screening-must-be-on-file.md),
+which closes the boundary ADR-0004 left open, on both lifecycles at
+once.
 
 ## License
 

@@ -5,7 +5,8 @@
   -> advertising.store) through the SAME multi-disposition scenario as
   `advertising.sim` (real seed ids/ops -- see that ns for the narrative).
   No invented numbers, no timestamps, byte-identical across reruns."
-  (:require [clojure.string :as str]
+  (:require [jp-go-dds.skin]
+            [clojure.string :as str]
             [advertising.store :as store]
             [advertising.operation :as op]
             [advertising.phase :as phase]
@@ -30,12 +31,26 @@
     - one op that auto-commits clean at phase 3 (:campaign/intake)
     - BOTH always-escalate high-stakes ops (:actuation/place-campaign,
       :actuation/order-creator-tieup), each approved by a human
-    - eight DISTINCT HARD-hold reasons that never reach a human:
-      :no-spec-basis, :media-spend-exceeds-authorized-budget,
-      :misleading-claim-risk-unresolved, :already-placed,
-      :creator-tieup-fee-exceeds-authorized-budget, :creator-ineligible,
+    - EVERY rule the Campaign Governor can raise, each reaching a hold
+      without a human ever being asked. Jurisdiction-side:
+      :no-spec-basis, :evidence-incomplete,
+      :media-spend-exceeds-authorized-budget,
+      :misleading-claim-risk-unresolved, :risk-screen-missing,
+      :already-placed. Media-platform-side (ADR-0002/0003):
+      :no-platform-policy-basis, :platform-check-incomplete,
+      :platform-prohibited-category,
+      :platform-restricted-category-unapproved,
+      :platform-attestation-missing, :sensitive-placement-context.
+      Creator-tie-up-side (ADR-0004/0005): :creator-ineligible,
+      :creator-screen-missing, :tieup-evidence-incomplete,
+      :creator-tieup-fee-exceeds-authorized-budget,
       :sponsorship-disclosure-missing (twice, from its two distinct
-      causes), :already-ordered."
+      causes), :already-ordered.
+
+      A rule with no case here is a rule the operator console never
+      shows and a reader never sees fire, which is why
+      `advertising.drivers-test` asserts the full set rather than a
+      sample of it."
   []
   (let [db (store/seed-db)
         actor (op/build db)]
@@ -44,8 +59,20 @@
                        :patch {:id "campaign-1" :client-name "Sato Bakery"}})
 
     ;; campaign-1: media-plan verification -- escalates (phase-approval), approved.
+    ;; campaign-1: placing before ANY assessment -> HARD hold. Several rules
+    ;; are true of it at once (:evidence-incomplete, :platform-check-incomplete,
+    ;; :risk-screen-missing) and the ledger says so -- a campaign with nothing
+    ;; done to it has more than one thing wrong, and flattening that to a
+    ;; single rule to tidy the demo would misreport the ledger.
+    (exec! actor "t1b" {:op :actuation/place-campaign :subject "campaign-1"})
+
     (exec! actor "t2" {:op :media-plan/verify :subject "campaign-1"})
     (approve! actor "t2")
+
+    ;; campaign-1: media-platform ad-policy conformance (chatgpt-ads,
+    ;; :local-services permitted) -- escalates, approved.
+    (exec! actor "t2b" {:op :platform/verify :subject "campaign-1"})
+    (approve! actor "t2b")
 
     ;; campaign-1: misleading-claim-risk screening -- clean, escalates, approved.
     (exec! actor "t3" {:op :risk/screen :subject "campaign-1"})
@@ -60,13 +87,15 @@
     ;; never reaches a human.
     (exec! actor "t5" {:op :media-plan/verify :subject "campaign-2" :no-spec? true})
 
-    ;; campaign-3 (JPN): media-plan verification escalates, approved -- sets up
+    ;; campaign-3 (JPN): both verifications escalate, approved -- sets up
     ;; the budget-exceeded HARD hold below.
     (exec! actor "t6" {:op :media-plan/verify :subject "campaign-3"})
     (approve! actor "t6")
+    (exec! actor "t6b" {:op :platform/verify :subject "campaign-3"})
+    (approve! actor "t6b")
 
     ;; campaign-3: fully evidenced but never screened -> HARD hold,
-    ;; :risk-screen-missing (ADR-0003). "We never looked" is not a clean state.
+    ;; :risk-screen-missing (ADR-0005). "We never looked" is not a clean state.
     (exec! actor "t6b" {:op :actuation/place-campaign :subject "campaign-3"})
 
     ;; campaign-3: screening runs clean, approved -- so the hold below is the
@@ -88,53 +117,109 @@
 
     ;; ---- creator tie-up (YouTube / influencer) lifecycle, ADR-0002 ----
 
-    ;; campaign-5 (JPN, @sato-bakery-review on youtube): creator screening and
+    ;; campaign-21 (JPN, @sato-bakery-review on youtube): creator screening and
     ;; tie-up brief both escalate, both approved.
-    (exec! actor "u1" {:op :creator/screen :subject "campaign-5"})
+    (exec! actor "u1" {:op :creator/screen :subject "campaign-21"})
     (approve! actor "u1")
-    (exec! actor "u2" {:op :tieup/verify :subject "campaign-5"})
+    ;; campaign-21: creator screened and eligible, but no tie-up evidence
+    ;; brief yet -> HARD hold, :tieup-evidence-incomplete on its own.
+    (exec! actor "u1b" {:op :actuation/order-creator-tieup :subject "campaign-21"})
+
+    (exec! actor "u2" {:op :tieup/verify :subject "campaign-21"})
     (approve! actor "u2")
 
     ;; campaign-5: tie-up order -- ALWAYS escalates (the second member of
     ;; advertising.governor/high-stakes), approved.
-    (exec! actor "u3" {:op :actuation/order-creator-tieup :subject "campaign-5"})
+    (exec! actor "u3" {:op :actuation/order-creator-tieup :subject "campaign-21"})
     (approve! actor "u3")
 
     ;; campaign-6: briefed but the creator was never screened -> HARD hold,
-    ;; :creator-screen-missing (ADR-0003, the tie-up half).
-    (exec! actor "u4" {:op :tieup/verify :subject "campaign-6"})
+    ;; :creator-screen-missing (ADR-0005, the tie-up half).
+    (exec! actor "u4" {:op :tieup/verify :subject "campaign-22"})
     (approve! actor "u4")
-    (exec! actor "u4b" {:op :actuation/order-creator-tieup :subject "campaign-6"})
+    (exec! actor "u4b" {:op :actuation/order-creator-tieup :subject "campaign-22"})
 
     ;; campaign-6: creator screens clean, approved -- so the hold below is the
     ;; combined-spend ceiling and nothing else: media 500000 + fee 400000 >
     ;; authorized 800000 -> :creator-tieup-fee-exceeds-authorized-budget.
-    (exec! actor "u4c" {:op :creator/screen :subject "campaign-6"})
+    (exec! actor "u4c" {:op :creator/screen :subject "campaign-22"})
     (approve! actor "u4c")
-    (exec! actor "u5" {:op :actuation/order-creator-tieup :subject "campaign-6"})
+    (exec! actor "u5" {:op :actuation/order-creator-tieup :subject "campaign-22"})
 
-    ;; campaign-7 (creator-eligibility-issue? true): HARD hold,
+    ;; campaign-23 (creator-eligibility-issue? true): HARD hold,
     ;; :creator-ineligible -- never reaches a human.
-    (exec! actor "u6" {:op :creator/screen :subject "campaign-7"})
+    (exec! actor "u6" {:op :creator/screen :subject "campaign-23"})
 
     ;; campaign-8: fully briefed and screened, but no disclosure label recorded
     ;; at all -> HARD hold, :sponsorship-disclosure-missing.
-    (exec! actor "u7" {:op :tieup/verify :subject "campaign-8"})
+    (exec! actor "u7" {:op :tieup/verify :subject "campaign-24"})
     (approve! actor "u7")
-    (exec! actor "u7b" {:op :creator/screen :subject "campaign-8"})
+    (exec! actor "u7b" {:op :creator/screen :subject "campaign-24"})
     (approve! actor "u7b")
-    (exec! actor "u8" {:op :actuation/order-creator-tieup :subject "campaign-8"})
+    (exec! actor "u8" {:op :actuation/order-creator-tieup :subject "campaign-24"})
 
     ;; campaign-9: 「タイアップ」 IS recorded, but is not among the 消費者庁's
     ;; own published examples -> the SAME HARD hold, different cause.
-    (exec! actor "u9" {:op :tieup/verify :subject "campaign-9"})
+    (exec! actor "u9" {:op :tieup/verify :subject "campaign-25"})
     (approve! actor "u9")
-    (exec! actor "u9b" {:op :creator/screen :subject "campaign-9"})
+    (exec! actor "u9b" {:op :creator/screen :subject "campaign-25"})
     (approve! actor "u9b")
-    (exec! actor "u10" {:op :actuation/order-creator-tieup :subject "campaign-9"})
+    (exec! actor "u10" {:op :actuation/order-creator-tieup :subject "campaign-25"})
 
-    ;; campaign-5 AGAIN: already ordered in u3 -> HARD hold, :already-ordered.
-    (exec! actor "u11" {:op :actuation/order-creator-tieup :subject "campaign-5"})
+    ;; campaign-21 AGAIN: already ordered in u3 -> HARD hold, :already-ordered.
+    (exec! actor "u11" {:op :actuation/order-creator-tieup :subject "campaign-21"})
+    ;; ---- media-platform HARD holds (ADR-0002). Every campaign below is
+    ;; CLEAN on every jurisdiction-side check and is held purely by the
+    ;; media platform's own published ad policy.
+
+    ;; campaign-5: platform "acme-adnet" has no transcribed policy ->
+    ;; HARD hold, :no-platform-policy-basis.
+    (exec! actor "t10" {:op :platform/verify :subject "campaign-5"})
+
+    ;; campaign-6: :gambling is prohibited by the platform's own policy ->
+    ;; HARD hold, :platform-prohibited-category.
+    (exec! actor "t11" {:op :platform/verify :subject "campaign-6"})
+
+    ;; campaign-7: :financial-services is restricted -- unapproved advertiser,
+    ;; and JPN is outside the platform's restricted-category jurisdictions ->
+    ;; HARD hold, :platform-restricted-category-unapproved.
+    (exec! actor "t12" {:op :platform/verify :subject "campaign-7"})
+
+    ;; campaign-8: generative surface, ad/answer distinguishability never
+    ;; attested -> HARD hold, :platform-attestation-missing.
+    (exec! actor "t13" {:op :platform/verify :subject "campaign-8"})
+
+    ;; campaign-9: placement requested against a context the platform refuses
+    ;; to serve ads near -> HARD hold, :sensitive-placement-context.
+    (exec! actor "t14" {:op :platform/verify :subject "campaign-9"})
+
+    ;; ---- the four seeded platforms disagree (ADR-0003) ----
+
+    ;; campaign-10: google-ads, :local-services -- same category and
+    ;; jurisdiction as campaign-1, different platform, and still clean
+    ;; because Google's category set is OPEN. Escalates, approved.
+    (exec! actor "t18" {:op :platform/verify :subject "campaign-10"})
+    (approve! actor "t18")
+
+    ;; campaign-11: meta-ads in DEU -- the EU DSA beneficiary/payer disclosure
+    ;; applies there and was never attested -> HARD hold,
+    ;; :platform-attestation-missing. The same facts in JPN would pass.
+    (exec! actor "t19" {:op :platform/verify :subject "campaign-11"})
+
+    ;; campaign-12: microsoft-advertising, :travel-experiences -- RESTRICTED
+    ;; there while PERMITTED on chatgpt-ads, and the per-category country
+    ;; table is untranscribed -> HARD hold,
+    ;; :platform-restricted-category-unapproved.
+    (exec! actor "t20" {:op :platform/verify :subject "campaign-12"})
+
+    ;; campaign-6: jurisdiction evidence cleared, then placement attempted.
+    ;; TWO platform-side rules accumulate in one decision --
+    ;; :platform-check-incomplete (no conformance assessment on file, because
+    ;; t11 above HELD instead of writing one) and :platform-prohibited-category
+    ;; -- showing that clearing the jurisdiction side clears nothing here.
+    (exec! actor "t15" {:op :media-plan/verify :subject "campaign-6"})
+    (approve! actor "t15")
+    (exec! actor "t16" {:op :actuation/place-campaign :subject "campaign-6"})
 
     db))
 
@@ -266,30 +351,15 @@
 
 ;; ----------------------------- page -----------------------------
 
-(def ^:private css
-  "body{font:14px/1.5 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;margin:0;padding:2rem;background:#0b0d10;color:#e6e8eb}
-  h1{font-size:1.4rem;margin:0 0 .25rem}
-  h2{font-size:1.05rem;margin:2rem 0 .5rem;color:#9fb3c8}
-  p.lede{color:#9aa4ae;margin:0 0 1.5rem}
-  table{border-collapse:collapse;width:100%;margin-bottom:1rem;font-size:.85rem}
-  th,td{border:1px solid #2a2f36;padding:.4rem .6rem;text-align:left;vertical-align:top}
-  th{background:#161a1f;color:#9fb3c8;font-weight:600}
-  tr:nth-child(even) td{background:#101317}
-  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.82em}
-  .ok{color:#5fd68a}
-  .warn{color:#e8c46b}
-  .err{color:#e8756b}
-  .critical{color:#ff5c5c;font-weight:700}
-  .muted{color:#6b7480}
-  footer{margin-top:2rem;color:#6b7480;font-size:.8rem}")
-
 (defn- render [db]
   (str/join
    "\n"
    ["<!doctype html><html lang=\"ja\"><head><meta charset=\"utf-8\">"
     "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
     "<title>advertising operator console (generated)</title>"
-    (str "<style>" css "</style></head><body>")
+    (str "<style>"
+   (jp-go-dds.skin/dds+skin)
+   "</style></head><body>")
     "<h1>cloud-itonami-isic-7310 -- Advertising Operator Console</h1>"
     (str "<p class=\"lede\">Generated at build time by <code>advertising.render-html</code>, "
          "driving the real <code>advertising.operation</code> StateGraph (intake -&gt; advise -&gt; "

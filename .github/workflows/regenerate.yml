@@ -3,6 +3,12 @@ on:
   schedule:
     - cron: '20 19 * * *'   # off-minute nightly slot, centrally assigned (flagship wave5 iteration 17) to avoid fleet collisions
   workflow_dispatch: {}
+  # This workflow is the only place the test suite and the linter run in
+  # CI, so a broken actor must not reach main and then be discovered by a
+  # 19:20 cron.
+  pull_request:
+  push:
+    branches: [main]
 permissions:
   contents: write
 jobs:
@@ -20,17 +26,54 @@ jobs:
         with: { distribution: temurin, java-version: "21" }
       - uses: DeLaGuardo/setup-clojure@13.0
         with: { cli: latest }
+      # The README says "clj-kondo (errors fail; CI mirrors this)" and quotes
+      # a test count and a coverage figure. Run them, so those claims are true.
+      - name: lint
+        working-directory: orgs/cloud-itonami/cloud-itonami-isic-7310
+        run: clojure -M:lint
+
+      - name: test
+        working-directory: orgs/cloud-itonami/cloud-itonami-isic-7310
+        run: clojure -M:dev:test
+
       - name: regenerate through the real actor
         working-directory: orgs/cloud-itonami/cloud-itonami-isic-7310
         run: clojure -M:dev:render-html
-      - name: verify (real output, not scaffolding)
+      - name: verify (real governed output, not just well-formed HTML)
         working-directory: orgs/cloud-itonami/cloud-itonami-isic-7310
         run: |
-          grep -q 'advertising.render-html' docs/samples/operator-console.html
-          grep -q '<tbody>' docs/samples/operator-console.html
-          test "$(wc -l < docs/samples/operator-console.html)" -gt 30
+          set -eu
+          f=docs/samples/operator-console.html
+          grep -q 'advertising.render-html' "$f"
+          grep -q '<tbody>' "$f"
+          # A page listing every campaign as "in progress" would pass the two
+          # checks above. These are what the console is FOR: both actuations
+          # drafted their record, and every rule the governor can raise
+          # reached the operator instead of being swallowed.
+          grep -q 'JPN-PLC-000000' "$f"
+          grep -q 'JPN-TIE-000000' "$f"
+          for rule in no-spec-basis evidence-incomplete \
+                      media-spend-exceeds-authorized-budget \
+                      misleading-claim-risk-unresolved risk-screen-missing \
+                      already-placed \
+                      no-platform-policy-basis platform-check-incomplete \
+                      platform-prohibited-category \
+                      platform-restricted-category-unapproved \
+                      platform-attestation-missing sensitive-placement-context \
+                      creator-ineligible creator-screen-missing \
+                      tieup-evidence-incomplete \
+                      creator-tieup-fee-exceeds-authorized-budget \
+                      sponsorship-disclosure-missing already-ordered; do
+            grep -q "$rule" "$f" || { echo "missing hold rule in console: $rule"; exit 1; }
+          done
+          test "$(wc -l < "$f")" -gt 30
           echo "operator console sanity ok"
+
       - name: commit when changed
+        # Only scheduled/dispatch runs may write. On a pull_request the
+        # checkout is a detached merge ref, so a commit would be discarded --
+        # and pushing from PR CI is not something this repo wants.
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         working-directory: orgs/cloud-itonami/cloud-itonami-isic-7310
         run: |
           if ! git diff --quiet docs/; then

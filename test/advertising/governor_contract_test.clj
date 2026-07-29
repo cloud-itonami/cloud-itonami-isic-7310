@@ -26,12 +26,16 @@
   (g/run* actor {:approval {:status :approved :by "op-1"}} {:thread-id tid :resume? true}))
 
 (defn- verify!
-  "Walks `subject` through verify -> approve, leaving a media-plan
-  assessment on file. Uses distinct thread-ids per call site by
-  suffixing `tid-prefix`."
+  "Walks `subject` through BOTH verification ops -> approve, leaving a
+  media-plan assessment AND a media-platform conformance assessment on
+  file -- the full evidence set `:actuation/place-campaign` requires
+  since ADR-0002. Uses distinct thread-ids per call site by suffixing
+  `tid-prefix`."
   [actor tid-prefix subject]
   (exec-op actor (str tid-prefix "-verify") {:op :media-plan/verify :subject subject} operator)
-  (approve! actor (str tid-prefix "-verify")))
+  (approve! actor (str tid-prefix "-verify"))
+  (exec-op actor (str tid-prefix "-pverify") {:op :platform/verify :subject subject} operator)
+  (approve! actor (str tid-prefix "-pverify")))
 
 (defn- screen!
   "Walks `subject` through misleading-claim-risk screening -> approve,
@@ -153,36 +157,36 @@
 (deftest tieup-verify-always-needs-approval
   (testing "tieup/verify is never in any phase's :auto set -- always human approval, even when clean"
     (let [[db actor] (fresh)
-          res (exec-op actor "u1" {:op :tieup/verify :subject "campaign-5"} operator)]
+          res (exec-op actor "u1" {:op :tieup/verify :subject "campaign-21"} operator)]
       (is (= :interrupted (:status res)))
       (let [r2 (approve! actor "u1")]
         (is (= :commit (get-in r2 [:state :disposition])))
-        (is (some? (store/tieup-brief-of db "campaign-5")))))))
+        (is (some? (store/tieup-brief-of db "campaign-21")))))))
 
 (deftest tieup-verify-without-spec-basis-is-held
   (testing "a tieup/verify proposal with no official disclosure basis -> HOLD, never reaches a human"
     (let [[db actor] (fresh)
           res (exec-op actor "u2"
-                    {:op :tieup/verify :subject "campaign-5" :no-spec? true} operator)]
+                    {:op :tieup/verify :subject "campaign-21" :no-spec? true} operator)]
       (is (= :hold (get-in res [:state :disposition])))
       (is (some #{:no-spec-basis} (-> (store/ledger db) first :basis)))
-      (is (nil? (store/tieup-brief-of db "campaign-5")) "no tie-up brief written"))))
+      (is (nil? (store/tieup-brief-of db "campaign-21")) "no tie-up brief written"))))
 
 (deftest order-tieup-without-brief-is-held
   (testing "actuation/order-creator-tieup before any tieup/verify -> HOLD (tie-up evidence incomplete)"
     (let [[db actor] (fresh)
-          res (exec-op actor "u3" {:op :actuation/order-creator-tieup :subject "campaign-5"} operator)]
+          res (exec-op actor "u3" {:op :actuation/order-creator-tieup :subject "campaign-21"} operator)]
       (is (= :hold (get-in res [:state :disposition])))
       (is (some #{:tieup-evidence-incomplete} (-> (store/ledger db) first :basis))))))
 
 (deftest combined-spend-exceeding-authorized-budget-is-held
   (testing "a tie-up fee that fits on its own but pushes media-spend + fee past the client's own authorization -> HOLD"
     (let [[db actor] (fresh)
-          c (store/campaign db "campaign-6")]
+          c (store/campaign db "campaign-22")]
       (is (< (:creator-tieup-fee c) (:authorized-budget c))
           "precondition: the fee ALONE is affordable -- a fee-only check would clear this")
-      (prepare-tieup! actor "u4pre" "campaign-6")
-      (let [res (exec-op actor "u4" {:op :actuation/order-creator-tieup :subject "campaign-6"} operator)]
+      (prepare-tieup! actor "u4pre" "campaign-22")
+      (let [res (exec-op actor "u4" {:op :actuation/order-creator-tieup :subject "campaign-22"} operator)]
         (is (= :hold (get-in res [:state :disposition])))
         (is (some #{:creator-tieup-fee-exceeds-authorized-budget} (-> (store/ledger db) last :basis)))
         (is (empty? (store/tieup-order-history db)))))))
@@ -190,17 +194,17 @@
 (deftest ineligible-creator-is-held-and-unoverridable
   (testing "an unresolved creator-eligibility issue -> HOLD, and never reaches request-approval -- exercised via :creator/screen DIRECTLY, not via the actuation op against an unscreened creator (the same discipline this repo's :risk/screen test records)"
     (let [[db actor] (fresh)
-          res (exec-op actor "u5" {:op :creator/screen :subject "campaign-7"} operator)]
+          res (exec-op actor "u5" {:op :creator/screen :subject "campaign-23"} operator)]
       (is (= :hold (get-in res [:state :disposition])) "settles immediately, no interrupt")
       (is (not= :interrupted (:status res)))
       (is (some #{:creator-ineligible} (-> (store/ledger db) first :basis)))
-      (is (nil? (store/creator-screen-of db "campaign-7")) "no clearance written"))))
+      (is (nil? (store/creator-screen-of db "campaign-23")) "no clearance written"))))
 
 (deftest tieup-with-no-disclosure-label-is-held
   (testing "ordering a creator tie-up with NO recorded sponsorship-disclosure label -> HOLD"
     (let [[db actor] (fresh)
-          _ (prepare-tieup! actor "u6pre" "campaign-8")
-          res (exec-op actor "u6" {:op :actuation/order-creator-tieup :subject "campaign-8"} operator)]
+          _ (prepare-tieup! actor "u6pre" "campaign-24")
+          res (exec-op actor "u6" {:op :actuation/order-creator-tieup :subject "campaign-24"} operator)]
       (is (= :hold (get-in res [:state :disposition])))
       (is (some #{:sponsorship-disclosure-missing} (-> (store/ledger db) last :basis)))
       (is (empty? (store/tieup-order-history db))))))
@@ -208,10 +212,10 @@
 (deftest tieup-with-unpublished-disclosure-label-is-held
   (testing "a label IS recorded, but 「タイアップ」 is not among the 消費者庁's own published examples -> the SAME HARD hold. Recording something must not be mistakable for recording something compliant."
     (let [[db actor] (fresh)
-          c (store/campaign db "campaign-9")]
+          c (store/campaign db "campaign-25")]
       (is (some? (:disclosure-label c)) "precondition: a label really is on file")
-      (prepare-tieup! actor "u7pre" "campaign-9")
-      (let [res (exec-op actor "u7" {:op :actuation/order-creator-tieup :subject "campaign-9"} operator)]
+      (prepare-tieup! actor "u7pre" "campaign-25")
+      (let [res (exec-op actor "u7" {:op :actuation/order-creator-tieup :subject "campaign-25"} operator)]
         (is (= :hold (get-in res [:state :disposition])))
         (is (some #{:sponsorship-disclosure-missing} (-> (store/ledger db) last :basis)))
         (is (empty? (store/tieup-order-history db)))))))
@@ -219,23 +223,23 @@
 (deftest order-tieup-always-escalates-then-human-decides
   (testing "a clean, fully-assessed creator tie-up still ALWAYS interrupts for human approval -- actuation/order-creator-tieup is never auto"
     (let [[db actor] (fresh)
-          _ (prepare-tieup! actor "u8pre" "campaign-5")
-          r1 (exec-op actor "u8" {:op :actuation/order-creator-tieup :subject "campaign-5"} operator)]
+          _ (prepare-tieup! actor "u8pre" "campaign-21")
+          r1 (exec-op actor "u8" {:op :actuation/order-creator-tieup :subject "campaign-21"} operator)]
       (is (= :interrupted (:status r1)) "pauses for human approval even when governor-clean")
       (testing "approve -> commit, tie-up order record drafted"
         (let [r2 (approve! actor "u8")]
           (is (= :commit (get-in r2 [:state :disposition])))
-          (is (true? (:tieup-ordered? (store/campaign db "campaign-5"))))
+          (is (true? (:tieup-ordered? (store/campaign db "campaign-21"))))
           (is (= 1 (count (store/tieup-order-history db))) "one draft tie-up order record")
           (is (= "youtube" (get (first (store/tieup-order-history db)) "platform"))))))))
 
 (deftest order-tieup-double-order-is-held
   (testing "ordering the same campaign's creator tie-up twice -> HOLD on the second attempt"
     (let [[db actor] (fresh)
-          _ (prepare-tieup! actor "u9pre" "campaign-5")
-          _ (exec-op actor "u9a" {:op :actuation/order-creator-tieup :subject "campaign-5"} operator)
+          _ (prepare-tieup! actor "u9pre" "campaign-21")
+          _ (exec-op actor "u9a" {:op :actuation/order-creator-tieup :subject "campaign-21"} operator)
           _ (approve! actor "u9a")
-          res (exec-op actor "u9" {:op :actuation/order-creator-tieup :subject "campaign-5"} operator)]
+          res (exec-op actor "u9" {:op :actuation/order-creator-tieup :subject "campaign-21"} operator)]
       (is (= :hold (get-in res [:state :disposition])))
       (is (some #{:already-ordered} (-> (store/ledger db) last :basis)))
       (is (= 1 (count (store/tieup-order-history db))) "still only the one earlier order"))))
@@ -243,14 +247,14 @@
 (deftest the-two-actuation-guards-are-independent
   (testing "placing a campaign does NOT mark its tie-up ordered, and ordering a tie-up does NOT mark the campaign placed -- separate booleans, separate sequences, separate histories"
     (let [[db actor] (fresh)]
-      (prepare-placement! actor "u10pre" "campaign-5")
-      (exec-op actor "u10a" {:op :actuation/place-campaign :subject "campaign-5"} operator)
+      (prepare-placement! actor "u10pre" "campaign-21")
+      (exec-op actor "u10a" {:op :actuation/place-campaign :subject "campaign-21"} operator)
       (approve! actor "u10a")
-      (is (true? (:campaign-placed? (store/campaign db "campaign-5"))))
-      (is (false? (:tieup-ordered? (store/campaign db "campaign-5")))
+      (is (true? (:campaign-placed? (store/campaign db "campaign-21"))))
+      (is (false? (:tieup-ordered? (store/campaign db "campaign-21")))
           "placement must not satisfy the tie-up guard")
-      (prepare-tieup! actor "u10b" "campaign-5")
-      (let [res (exec-op actor "u10c" {:op :actuation/order-creator-tieup :subject "campaign-5"} operator)]
+      (prepare-tieup! actor "u10b" "campaign-21")
+      (let [res (exec-op actor "u10c" {:op :actuation/order-creator-tieup :subject "campaign-21"} operator)]
         (is (= :interrupted (:status res)) "the tie-up is still available to order")
         (approve! actor "u10c"))
       (is (= 1 (count (store/placement-history db))))
@@ -259,10 +263,10 @@
       (is (= "JPN-TIE-000000" (get (first (store/tieup-order-history db)) "record_id"))
           "each actuation runs its own jurisdiction-scoped sequence"))))
 
-;; ---------------- "we never looked" is not a clean state (ADR-0003) ----------------
+;; ---------------- "we never looked" is not a clean state (ADR-0005) ----------------
 
 (deftest placing-without-any-risk-screening-is-held
-  (testing "a fully-evidenced campaign that was NEVER screened for misleading-claim risk must not place. Until ADR-0003 this passed: the unresolved-risk rule only fired when a screening record existed AND said :unresolved, so skipping the screening entirely was the way through."
+  (testing "a fully-evidenced campaign that was NEVER screened for misleading-claim risk must not place. Until ADR-0005 this passed: the unresolved-risk rule only fired when a screening record existed AND said :unresolved, so skipping the screening entirely was the way through."
     (let [[db actor] (fresh)
           _ (verify! actor "s1pre" "campaign-1")]
       (is (nil? (store/risk-screen-of db "campaign-1")) "precondition: nothing on file")
@@ -274,9 +278,9 @@
 (deftest ordering-without-any-creator-screening-is-held
   (testing "the tie-up half of the same hole: a briefed tie-up whose creator was never screened must not order"
     (let [[db actor] (fresh)
-          _ (brief! actor "s2pre" "campaign-5")]
-      (is (nil? (store/creator-screen-of db "campaign-5")) "precondition: nothing on file")
-      (let [res (exec-op actor "s2" {:op :actuation/order-creator-tieup :subject "campaign-5"} operator)]
+          _ (brief! actor "s2pre" "campaign-21")]
+      (is (nil? (store/creator-screen-of db "campaign-21")) "precondition: nothing on file")
+      (let [res (exec-op actor "s2" {:op :actuation/order-creator-tieup :subject "campaign-21"} operator)]
         (is (= :hold (get-in res [:state :disposition])))
         (is (some #{:creator-screen-missing} (-> (store/ledger db) last :basis)))
         (is (empty? (store/tieup-order-history db)))))))
@@ -309,6 +313,123 @@
         (is (some #{:misleading-claim-risk-unresolved} basis))
         (is (not (some #{:risk-screen-missing} basis))
             "the specific finding is reported, not the generic absence")))))
+;; ---------------- media-platform governor family (ADR-0002) ----------------
+;;
+;; Each of these campaigns is CLEAN on every jurisdiction-side check --
+;; lawful spend, no misleading-claim risk, a covered jurisdiction --
+;; and is held purely by the media platform's own published ad policy.
+;; That is the point of the second family: the two authorities are
+;; independent, and clearing one says nothing about the other.
+
+(deftest platform-verify-always-needs-approval
+  (testing "platform conformance is never in any phase's :auto set -- always human approval, even when clean"
+    (let [[db actor] (fresh)
+          res (exec-op actor "p1" {:op :platform/verify :subject "campaign-1"} operator)]
+      (is (= :interrupted (:status res)))
+      (let [r2 (approve! actor "p1")]
+        (is (= :commit (get-in r2 [:state :disposition])))
+        (is (true? (:conformant? (store/platform-check-of db "campaign-1"))))))))
+
+(deftest unknown-platform-is-held
+  (testing "a campaign targeting a platform with no transcribed ad policy -> HOLD, never reaches a human"
+    (let [[db actor] (fresh)
+          res (exec-op actor "p2" {:op :platform/verify :subject "campaign-5"} operator)]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (not= :interrupted (:status res)))
+      (is (some #{:no-platform-policy-basis} (-> (store/ledger db) first :basis)))
+      (is (nil? (store/platform-check-of db "campaign-5")) "no conformance assessment written"))))
+
+(deftest platform-prohibited-category-is-held
+  (testing "a category the platform's own policy names as prohibited -> HOLD"
+    (let [[db actor] (fresh)
+          res (exec-op actor "p3" {:op :platform/verify :subject "campaign-6"} operator)]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:platform-prohibited-category} (-> (store/ledger db) first :basis))))))
+
+(deftest platform-restricted-category-without-approval-is-held
+  (testing "a restricted category with neither advertiser approval nor an allowed jurisdiction -> HOLD"
+    (let [[db actor] (fresh)
+          res (exec-op actor "p4" {:op :platform/verify :subject "campaign-7"} operator)]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:platform-restricted-category-unapproved} (-> (store/ledger db) first :basis))))))
+
+(deftest generative-surface-distinguishability-must-be-attested
+  (testing "on a generative surface, an unattested ad/answer distinguishability -> HOLD (interface mimicry)"
+    (let [[db actor] (fresh)
+          res (exec-op actor "p5" {:op :platform/verify :subject "campaign-8"} operator)]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:platform-attestation-missing} (-> (store/ledger db) first :basis))))))
+
+(deftest excluded-placement-context-is-held
+  (testing "a placement requested against a context the platform refuses to serve ads near -> HOLD"
+    (let [[db actor] (fresh)
+          res (exec-op actor "p6" {:op :platform/verify :subject "campaign-9"} operator)]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:sensitive-placement-context} (-> (store/ledger db) first :basis))))))
+
+(deftest place-campaign-without-platform-check-is-held
+  (testing "clearing the JURISDICTION's evidence checklist does not clear the PLATFORM -- actuation still holds"
+    (let [[db actor] (fresh)]
+      (exec-op actor "p7-verify" {:op :media-plan/verify :subject "campaign-1"} operator)
+      (approve! actor "p7-verify")
+      (let [res (exec-op actor "p7" {:op :actuation/place-campaign :subject "campaign-1"} operator)]
+        (is (= :hold (get-in res [:state :disposition])))
+        (is (some #{:platform-check-incomplete} (-> (store/ledger db) last :basis)))
+        (is (empty? (store/placement-history db)))))))
+
+(deftest platform-holds-survive-a-human-approver
+  (testing "the platform family is HARD: a prohibited category never reaches request-approval at all, so there is nobody to override it"
+    (let [[db actor] (fresh)]
+      (verify! actor "p8pre" "campaign-6")
+      (let [res (exec-op actor "p8" {:op :actuation/place-campaign :subject "campaign-6"} operator)]
+        (is (= :hold (get-in res [:state :disposition])))
+        (is (not= :interrupted (:status res)) "never pauses for a human")
+        (is (some #{:platform-prohibited-category} (-> (store/ledger db) last :basis)))
+        (is (empty? (store/placement-history db)))))))
+
+(deftest placement-record-names-the-platform
+  (testing "a committed placement records WHICH platform it ran on"
+    (let [[db actor] (fresh)]
+      (prepare-placement! actor "p9pre" "campaign-1")
+      (exec-op actor "p9" {:op :actuation/place-campaign :subject "campaign-1"} operator)
+      (approve! actor "p9")
+      (is (= "chatgpt-ads" (get (first (store/placement-history db)) "platform"))))))
+
+;; ---------------- cross-platform disagreement (ADR-0003) ----------------
+
+(deftest same-category-same-jurisdiction-different-platform-different-verdict
+  (testing "campaign-1 and campaign-10 are both JPN :local-services; only the target platform differs, and both clear"
+    (let [[db actor] (fresh)]
+      (exec-op actor "x1" {:op :platform/verify :subject "campaign-1"} operator)
+      (approve! actor "x1")
+      (exec-op actor "x2" {:op :platform/verify :subject "campaign-10"} operator)
+      (approve! actor "x2")
+      (is (= "chatgpt-ads" (:platform (store/platform-check-of db "campaign-1"))))
+      (is (= "google-ads" (:platform (store/platform-check-of db "campaign-10"))))
+      (is (true? (:conformant? (store/platform-check-of db "campaign-10")))
+          "google-ads does not name :local-services and does not close its category set"))))
+
+(deftest microsoft-holds-a-category-chatgpt-permits
+  (testing "campaign-12 is :travel-experiences -- permitted on chatgpt-ads, restricted on microsoft-advertising with no transcribed country table"
+    (let [[db actor] (fresh)
+          res (exec-op actor "x3" {:op :platform/verify :subject "campaign-12"} operator)]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:platform-restricted-category-unapproved} (-> (store/ledger db) first :basis)))
+      (is (nil? (store/platform-check-of db "campaign-12"))))))
+
+(deftest jurisdiction-scoped-attestation-holds-only-where-it-applies
+  (testing "campaign-11 runs on meta-ads in DEU and has not made the EU DSA beneficiary/payer disclosure"
+    (let [[db actor] (fresh)
+          res (exec-op actor "x4" {:op :platform/verify :subject "campaign-11"} operator)]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:platform-attestation-missing} (-> (store/ledger db) first :basis)))))
+  (testing "the same campaign facts in JPN would NOT be held -- the requirement follows the jurisdiction"
+    (let [[db actor] (fresh)]
+      (store/commit-record! db {:effect :campaign/upsert
+                                :value {:id "campaign-11" :jurisdiction "JPN"}})
+      (exec-op actor "x5" {:op :platform/verify :subject "campaign-11"} operator)
+      (approve! actor "x5")
+      (is (true? (:conformant? (store/platform-check-of db "campaign-11")))))))
 
 (deftest every-decision-leaves-one-ledger-fact
   (testing "write-only-through-ledger: N operations -> N ledger facts"

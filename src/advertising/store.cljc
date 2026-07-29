@@ -47,6 +47,7 @@
   (media-plan-of [s campaign-id] "committed media-plan evidence assessment, or nil")
   (creator-screen-of [s campaign-id] "committed creator-eligibility screening verdict for a campaign's tie-up, or nil")
   (tieup-brief-of [s campaign-id] "committed creator-tie-up evidence assessment, or nil")
+  (platform-check-of [s campaign-id] "committed media-platform ad-policy conformance assessment, or nil")
   (ledger [s])
   (placement-history [s] "the append-only campaign-placement history (advertising.registry drafts)")
   (tieup-order-history [s] "the append-only creator-tie-up-order history (advertising.registry drafts)")
@@ -60,98 +61,222 @@
 
 ;; ----------------------------- demo data -----------------------------
 
+(def ^:private clean-platform-facts
+  "The media-platform facts a campaign needs to clear every platform-
+  side governor check on `chatgpt-ads`. Spelled out once so the demo
+  campaigns that exercise OTHER failure modes are not accidentally
+  also platform-dirty -- each demo campaign should fail for exactly
+  the one reason it exists to demonstrate."
+  {:target-platform "chatgpt-ads"
+   :ad-category :local-services
+   :advertiser-approval-on-file? false
+   ;; every BASE attestation any seeded platform requires, so switching
+   ;; :target-platform alone never makes a campaign dirty by accident.
+   ;; Jurisdiction-scoped attestations (Meta's EU DSA disclosure) are
+   ;; deliberately NOT here -- campaign-11 exists to be held by one.
+   :attestations {:distinguishable-from-product-ui true
+                  :landing-page-consistency true
+                  :advertiser-identity-verified true
+                  :editorial-standards true}
+   :requested-placement-contexts []})
+
+(def ^:private clean-tieup-facts
+  "The creator-tie-up booleans every campaign carries, whether or not it
+  has a tie-up. They exist on ALL campaigns so `MemStore` (raw EDN) and
+  `DatomicStore` (which coerces an absent attribute to false on pull)
+  agree -- store-contract parity is asserted field by field, and a nil
+  on one backend against a false on the other is a real divergence, not
+  a cosmetic one."
+  {:creator-eligibility-issue? false
+   :tieup-ordered? false})
+
 (defn demo-data
   "A small, self-contained campaign set covering BOTH actuation
   lifecycles (placing a campaign; ordering a creator tie-up) so the
   actor + tests run offline.
 
-  `campaign-1`..`campaign-4` exercise the placement lifecycle and its
-  HARD holds; `campaign-5`..`campaign-9` exercise the creator-tie-up
-  lifecycle and its four DISTINCT HARD holds -- a combined spend past
-  the client's authorization, an ineligible creator, no recorded
-  sponsorship-disclosure label, and a recorded label the
-  jurisdiction's own authority does not publish. The last of these is
-  drawn from a real failure mode, not invented: 「タイアップ」 on its
-  own is a word the industry uses that is NOT among the 消費者庁's own
-  published examples (「広告」「宣伝」「プロモーション」「PR」), so an
-  operator who records it has recorded something -- and the governor
-  must still hold."
+  campaign-1..4 exercise the jurisdiction-side governor checks;
+  campaign-5..9 the media-platform-side ones on `chatgpt-ads`;
+  campaign-10..12 the fact that the four seeded platforms DISAGREE
+  (ADR-0003) -- same category, same jurisdiction, different verdict;
+  and campaign-21..25 the creator-tie-up lifecycle and its four
+  DISTINCT HARD holds (ADR-0004) -- a combined media-spend-plus-fee
+  past the client's own authorization, an ineligible creator, no
+  recorded sponsorship-disclosure label, and a recorded label the
+  jurisdiction's own authority does not publish.
+
+  That last one is drawn from a real failure mode, not invented:
+  「tie-up」 on its own is a word the industry uses that is NOT among
+  the Consumer Affairs Agency's own published examples, so an operator
+  who records it has recorded something -- and the governor must still
+  hold.
+
+  The tie-up campaigns merge `clean-platform-facts` too. The platform
+  checks are scoped to `:platform/verify`/`:actuation/place-campaign`
+  and so never see a tie-up order, but a tie-up campaign may also be
+  PLACED, and a demo campaign should fail for exactly the one reason it
+  exists to demonstrate."
   []
   {:campaigns
-   {"campaign-1" {:id "campaign-1" :client-name "Sato Bakery"
+   (into {}
+         (map (fn [[id c]] [id (merge clean-tieup-facts c)]))
+         {"campaign-1" (merge clean-platform-facts
+                 {:id "campaign-1" :client-name "Sato Bakery"
                  :proposed-media-spend 500000 :authorized-budget 800000
                  :misleading-claim-risk-unresolved? false
-                 :creator-eligibility-issue? false
-                 :campaign-placed? false :tieup-ordered? false
-                 :jurisdiction "JPN" :status :intake}
-    "campaign-2" {:id "campaign-2" :client-name "Atlantis Goods"
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+    "campaign-2" (merge clean-platform-facts
+                 {:id "campaign-2" :client-name "Atlantis Goods"
                  :proposed-media-spend 500000 :authorized-budget 800000
                  :misleading-claim-risk-unresolved? false
-                 :creator-eligibility-issue? false
-                 :campaign-placed? false :tieup-ordered? false
-                 :jurisdiction "ATL" :status :intake}
-    "campaign-3" {:id "campaign-3" :client-name "鈴木工務店"
+                 :campaign-placed? false
+                 :jurisdiction "ATL" :status :intake})
+    "campaign-3" (merge clean-platform-facts
+                 {:id "campaign-3" :client-name "鈴木工務店"
                  :proposed-media-spend 900000 :authorized-budget 800000
                  :misleading-claim-risk-unresolved? false
-                 :creator-eligibility-issue? false
-                 :campaign-placed? false :tieup-ordered? false
-                 :jurisdiction "JPN" :status :intake}
-    "campaign-4" {:id "campaign-4" :client-name "田中青果"
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+    "campaign-4" (merge clean-platform-facts
+                 {:id "campaign-4" :client-name "田中青果"
                  :proposed-media-spend 500000 :authorized-budget 800000
                  :misleading-claim-risk-unresolved? true
-                 :creator-eligibility-issue? false
-                 :campaign-placed? false :tieup-ordered? false
-                 :jurisdiction "JPN" :status :intake}
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+    ;; -- media-platform failure modes --
+    ;; an ad network with no transcribed policy in advertising.platform
+    "campaign-5" (merge clean-platform-facts
+                 {:id "campaign-5" :client-name "Kaneko Tools"
+                 :target-platform "acme-adnet"
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+    ;; a category the platform's own policy names as prohibited
+    "campaign-6" (merge clean-platform-facts
+                 {:id "campaign-6" :client-name "Lucky Palace"
+                 :ad-category :gambling
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+    ;; a restricted category, unapproved advertiser AND outside the
+    ;; platform's restricted-category jurisdiction set
+    "campaign-7" (merge clean-platform-facts
+                 {:id "campaign-7" :client-name "Marunouchi Lending"
+                 :ad-category :financial-services
+                 :advertiser-approval-on-file? false
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+    ;; a generative surface with the interface-mimicry attestation absent
+    "campaign-8" (merge clean-platform-facts
+                 {:id "campaign-8" :client-name "Yamada Travel"
+                 :ad-category :travel-experiences
+                 :attestations {:landing-page-consistency true
+                                :advertiser-identity-verified true}
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+    ;; placement requested against a context the platform excludes
+    "campaign-9" (merge clean-platform-facts
+                 {:id "campaign-9" :client-name "Aoi Clinic Supplies"
+                 :requested-placement-contexts [:mental-and-personal-health]
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+    ;; -- cross-platform disagreement (ADR-0003) --
+    ;; google-ads, OPEN category set: :local-services is unnamed by that
+    ;; policy, so it resolves :permitted and this campaign is placeable --
+    ;; the same category, on the same jurisdiction, as campaign-1.
+    "campaign-10" (merge clean-platform-facts
+                 {:id "campaign-10" :client-name "Ishikawa Dental"
+                 :target-platform "google-ads"
+                 :ad-category :local-services
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+    ;; meta-ads in DEU: the EU DSA beneficiary/payer disclosure is required
+    ;; only where it applies, and this campaign has not made it.
+    "campaign-11" (merge clean-platform-facts
+                 {:id "campaign-11" :client-name "Berliner Möbelhaus"
+                 :target-platform "meta-ads"
+                 :ad-category :lifestyle-household
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "DEU" :status :intake})
+    ;; microsoft-advertising: :travel-experiences is RESTRICTED there while
+    ;; being PERMITTED on chatgpt-ads, and the per-category country table
+    ;; has not been transcribed -- so it holds on both counts.
+    "campaign-12" (merge clean-platform-facts
+                 {:id "campaign-12" :client-name "Hokkaido Onsen Tours"
+                 :target-platform "microsoft-advertising"
+                 :ad-category :travel-experiences
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
 
-    ;; ---- creator tie-up (YouTube / influencer) lifecycle ----
+    ;; ---- creator tie-up (YouTube / influencer) lifecycle, ADR-0004 ----
     ;; clean: 500000 media + 200000 fee = 700000, within the 800000 the
     ;; client authorized; creator screened clean; 「PR」 is a 消費者庁-
     ;; published disclosure label.
-    "campaign-5" {:id "campaign-5" :client-name "Sato Bakery"
+    "campaign-21" (merge clean-platform-facts
+                 {:id "campaign-21" :client-name "Sato Bakery"
                  :proposed-media-spend 500000 :authorized-budget 800000
                  :misleading-claim-risk-unresolved? false
                  :creator-eligibility-issue? false
                  :creator-handle "@sato-bakery-review" :creator-platform :youtube
                  :creator-tieup-fee 200000 :disclosure-label "PR"
                  :campaign-placed? false :tieup-ordered? false
-                 :jurisdiction "JPN" :status :intake}
+                 :jurisdiction "JPN" :status :intake})
     ;; the fee alone (400000) fits the budget; 500000 + 400000 does not.
-    "campaign-6" {:id "campaign-6" :client-name "関西グルメ舎"
+    "campaign-22" (merge clean-platform-facts
+                 {:id "campaign-22" :client-name "関西グルメ舎"
                  :proposed-media-spend 500000 :authorized-budget 800000
                  :misleading-claim-risk-unresolved? false
                  :creator-eligibility-issue? false
                  :creator-handle "@kansai-gourmet" :creator-platform :youtube
                  :creator-tieup-fee 400000 :disclosure-label "PR"
                  :campaign-placed? false :tieup-ordered? false
-                 :jurisdiction "JPN" :status :intake}
+                 :jurisdiction "JPN" :status :intake})
     ;; creator carries an unresolved eligibility issue (e.g. a prior
     ;; undisclosed-endorsement finding) -- HARD hold at screening time.
-    "campaign-7" {:id "campaign-7" :client-name "北野デンタル"
+    "campaign-23" (merge clean-platform-facts
+                 {:id "campaign-23" :client-name "北野デンタル"
                  :proposed-media-spend 300000 :authorized-budget 800000
                  :misleading-claim-risk-unresolved? false
                  :creator-eligibility-issue? true
                  :creator-handle "@kitano-clinic-fan" :creator-platform :instagram
                  :creator-tieup-fee 100000 :disclosure-label "PR"
                  :campaign-placed? false :tieup-ordered? false
-                 :jurisdiction "JPN" :status :intake}
+                 :jurisdiction "JPN" :status :intake})
     ;; no disclosure label recorded at all.
-    "campaign-8" {:id "campaign-8" :client-name "みどり不動産"
+    "campaign-24" (merge clean-platform-facts
+                 {:id "campaign-24" :client-name "みどり不動産"
                  :proposed-media-spend 300000 :authorized-budget 800000
                  :misleading-claim-risk-unresolved? false
                  :creator-eligibility-issue? false
                  :creator-handle "@midori-room-tour" :creator-platform :youtube
                  :creator-tieup-fee 100000 :disclosure-label nil
                  :campaign-placed? false :tieup-ordered? false
-                 :jurisdiction "JPN" :status :intake}
+                 :jurisdiction "JPN" :status :intake})
     ;; a label IS recorded -- just not one the authority publishes.
-    "campaign-9" {:id "campaign-9" :client-name "湘南サーフ用品"
+    "campaign-25" (merge clean-platform-facts
+                 {:id "campaign-25" :client-name "湘南サーフ用品"
                  :proposed-media-spend 300000 :authorized-budget 800000
                  :misleading-claim-risk-unresolved? false
                  :creator-eligibility-issue? false
                  :creator-handle "@shonan-surf-log" :creator-platform :youtube
                  :creator-tieup-fee 100000 :disclosure-label "タイアップ"
                  :campaign-placed? false :tieup-ordered? false
-                 :jurisdiction "JPN" :status :intake}}})
+                 :jurisdiction "JPN" :status :intake})})})
 
 ;; ----------------------------- shared commit logic -----------------------------
 
@@ -162,7 +287,8 @@
   [s campaign-id]
   (let [c (campaign s campaign-id)
         seq-n (next-placement-sequence s (:jurisdiction c))
-        result (registry/register-campaign-placement campaign-id (:jurisdiction c) seq-n)]
+        result (registry/register-campaign-placement campaign-id (:jurisdiction c) seq-n
+                                                     (:target-platform c))]
     {:result result
      :campaign-patch {:campaign-placed? true
                      :placement-number (get result "placement_number")}}))
@@ -193,6 +319,7 @@
   (media-plan-of [_ campaign-id] (get-in @a [:media-plans campaign-id]))
   (creator-screen-of [_ campaign-id] (get-in @a [:creator-screens campaign-id]))
   (tieup-brief-of [_ campaign-id] (get-in @a [:tieup-briefs campaign-id]))
+  (platform-check-of [_ campaign-id] (get-in @a [:platform-checks campaign-id]))
   (ledger [_] (:ledger @a))
   (placement-history [_] (:placements @a))
   (tieup-order-history [_] (:tieup-orders @a))
@@ -216,6 +343,8 @@
 
       :tieup-brief/set
       (swap! a assoc-in [:tieup-briefs (first path)] payload)
+      :platform-check/set
+      (swap! a assoc-in [:platform-checks (first path)] payload)
 
       :campaign/mark-placed
       (let [campaign-id (first path)
@@ -248,8 +377,8 @@
   default."
   []
   (->MemStore (atom (assoc (demo-data)
-                           :media-plans {} :risk-screens {} :ledger [] :placement-sequences {}
-                           :placements []
+                           :media-plans {} :risk-screens {} :platform-checks {}
+                           :ledger [] :placement-sequences {} :placements []
                            :creator-screens {} :tieup-briefs {} :tieup-sequences {}
                            :tieup-orders []))))
 
@@ -266,39 +395,54 @@
   ~190 actors hand-roll; this store keeps only its domain wiring."
   (ls/identity-schema
    [:campaign/id :media-plan/campaign-id :risk-screen/campaign-id
+    :platform-check/campaign-id
     :creator-screen/campaign-id :tieup-brief/campaign-id
     :ledger/seq :placement/seq :placement-sequence/jurisdiction
     :tieup-order/seq :tieup-sequence/jurisdiction]))
 
 (defn- campaign->tx [{:keys [id client-name proposed-media-spend authorized-budget
                             misleading-claim-risk-unresolved?
+                            campaign-placed?
+                            jurisdiction status placement-number
+                            target-platform ad-category advertiser-approval-on-file?
+                            attestations requested-placement-contexts
                             creator-eligibility-issue?
                             creator-handle creator-platform creator-tieup-fee disclosure-label
-                            campaign-placed? tieup-ordered?
-                            jurisdiction status placement-number tieup-order-number]}]
+                            tieup-ordered? tieup-order-number]}]
   (cond-> {:campaign/id id}
     client-name                                   (assoc :campaign/client-name client-name)
     proposed-media-spend                          (assoc :campaign/proposed-media-spend proposed-media-spend)
     authorized-budget                              (assoc :campaign/authorized-budget authorized-budget)
     (some? misleading-claim-risk-unresolved?)      (assoc :campaign/misleading-claim-risk-unresolved? misleading-claim-risk-unresolved?)
+    (some? campaign-placed?)                       (assoc :campaign/campaign-placed? campaign-placed?)
+    jurisdiction                                    (assoc :campaign/jurisdiction jurisdiction)
+    status                                          (assoc :campaign/status status)
+    placement-number                                (assoc :campaign/placement-number placement-number)
+    ;; -- media platform (ADR-0002) --
+    target-platform                                 (assoc :campaign/target-platform target-platform)
+    ad-category                                     (assoc :campaign/ad-category ad-category)
+    (some? advertiser-approval-on-file?)            (assoc :campaign/advertiser-approval-on-file? advertiser-approval-on-file?)
+    ;; compound -> EDN blob, so langchain.db doesn't expand them into sub-entities
+    (some? attestations)                            (assoc :campaign/attestations (ls/enc attestations))
+    (some? requested-placement-contexts)            (assoc :campaign/requested-placement-contexts (ls/enc requested-placement-contexts))
+    ;; -- creator tie-up (ADR-0004) --
     (some? creator-eligibility-issue?)             (assoc :campaign/creator-eligibility-issue? creator-eligibility-issue?)
     creator-handle                                  (assoc :campaign/creator-handle creator-handle)
     creator-platform                                (assoc :campaign/creator-platform creator-platform)
     creator-tieup-fee                               (assoc :campaign/creator-tieup-fee creator-tieup-fee)
     disclosure-label                                (assoc :campaign/disclosure-label disclosure-label)
-    (some? campaign-placed?)                       (assoc :campaign/campaign-placed? campaign-placed?)
     (some? tieup-ordered?)                         (assoc :campaign/tieup-ordered? tieup-ordered?)
-    jurisdiction                                    (assoc :campaign/jurisdiction jurisdiction)
-    status                                          (assoc :campaign/status status)
-    placement-number                                (assoc :campaign/placement-number placement-number)
     tieup-order-number                              (assoc :campaign/tieup-order-number tieup-order-number)))
 
 (def ^:private campaign-pull
   [:campaign/id :campaign/client-name :campaign/proposed-media-spend :campaign/authorized-budget
    :campaign/misleading-claim-risk-unresolved? :campaign/campaign-placed?
+   :campaign/jurisdiction :campaign/status :campaign/placement-number
+   :campaign/target-platform :campaign/ad-category :campaign/advertiser-approval-on-file?
+   :campaign/attestations :campaign/requested-placement-contexts
    :campaign/creator-eligibility-issue? :campaign/creator-handle :campaign/creator-platform
-   :campaign/creator-tieup-fee :campaign/disclosure-label :campaign/tieup-ordered?
-   :campaign/jurisdiction :campaign/status :campaign/placement-number :campaign/tieup-order-number])
+   :campaign/creator-tieup-fee :campaign/disclosure-label
+   :campaign/tieup-ordered? :campaign/tieup-order-number])
 
 (defn- pull->campaign [m]
   (when (:campaign/id m)
@@ -315,7 +459,12 @@
      :tieup-ordered? (boolean (:campaign/tieup-ordered? m))
      :jurisdiction (:campaign/jurisdiction m) :status (:campaign/status m)
      :placement-number (:campaign/placement-number m)
-     :tieup-order-number (:campaign/tieup-order-number m)}))
+     :tieup-order-number (:campaign/tieup-order-number m)
+     :target-platform (:campaign/target-platform m)
+     :ad-category (:campaign/ad-category m)
+     :advertiser-approval-on-file? (boolean (:campaign/advertiser-approval-on-file? m))
+     :attestations (or (ls/dec* (:campaign/attestations m)) {})
+     :requested-placement-contexts (or (ls/dec* (:campaign/requested-placement-contexts m)) [])}))
 
 (defrecord DatomicStore [conn]
   Store
@@ -340,6 +489,10 @@
   (tieup-brief-of [_ campaign-id]
     (ls/dec* (d/q '[:find ?p . :in $ ?cid
                 :where [?a :tieup-brief/campaign-id ?cid] [?a :tieup-brief/payload ?p]]
+              (d/db conn) campaign-id)))
+  (platform-check-of [_ campaign-id]
+    (ls/dec* (d/q '[:find ?p . :in $ ?cid
+                :where [?a :platform-check/campaign-id ?cid] [?a :platform-check/payload ?p]]
               (d/db conn) campaign-id)))
   (ledger [_] (ls/read-stream conn :ledger/seq :ledger/fact))
   (placement-history [_] (ls/read-stream conn :placement/seq :placement/record))
@@ -374,6 +527,8 @@
 
       :tieup-brief/set
       (d/transact! conn [{:tieup-brief/campaign-id (first path) :tieup-brief/payload (ls/enc payload)}])
+      :platform-check/set
+      (d/transact! conn [{:platform-check/campaign-id (first path) :platform-check/payload (ls/enc payload)}])
 
       :campaign/mark-placed
       (let [campaign-id (first path)

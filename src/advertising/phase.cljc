@@ -5,7 +5,9 @@
     Phase 0  read-only        -- no writes, still governor-gated.
     Phase 1  assisted-intake  -- campaign intake allowed, every write
                                  needs human approval.
-    Phase 2  assisted-verify  -- adds media-plan verification,
+    Phase 2  assisted-verify  -- adds media-plan verification, media-
+                                 platform ad-policy conformance
+                                 (`:platform/verify`, ADR-0002),
                                  misleading-claim-risk screening,
                                  creator-eligibility screening and
                                  creator-tie-up brief writes, still
@@ -35,13 +37,14 @@
 (def read-ops  #{})
 
 (def placement-ops
-  "The original campaign-placement lifecycle."
-  #{:campaign/intake :media-plan/verify :risk/screen
+  "The campaign-placement lifecycle, including the media-platform
+  ad-policy conformance op added by ADR-0002."
+  #{:campaign/intake :media-plan/verify :platform/verify :risk/screen
     :actuation/place-campaign})
 
 (def tieup-ops
   "The creator-tie-up (YouTube / influencer) lifecycle, added in
-  ADR-0002. Its own screening op, its own evidence-brief op, its own
+  ADR-0004. Its own screening op, its own evidence-brief op, its own
   actuation."
   #{:creator/screen :tieup/verify :actuation/order-creator-tieup})
 
@@ -70,8 +73,8 @@
   auto-commit when governor-clean>}."
   {0 {:label "read-only"        :writes #{}                                  :auto (auto-set #{})}
    1 {:label "assisted-intake"  :writes #{:campaign/intake}                   :auto (auto-set #{})}
-   2 {:label "assisted-verify"  :writes #{:campaign/intake :media-plan/verify :risk/screen
-                                          :creator/screen :tieup/verify}
+   2 {:label "assisted-verify"  :writes #{:campaign/intake :media-plan/verify :platform/verify
+                                          :risk/screen :creator/screen :tieup/verify}
       :auto (auto-set #{})}
    3 {:label "supervised-auto"  :writes write-ops
       :auto (auto-set #{:campaign/intake})}})

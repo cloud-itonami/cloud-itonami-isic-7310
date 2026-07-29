@@ -1,13 +1,13 @@
-# ADR-0003: "We never looked" is not a clean state
+# ADR-0005: "We never looked" is not a clean state
 
 - Status: accepted
 - Date: 2026-07-29
-- Closes: the R0 boundary recorded in ADR-0002
-- Extends: ADR-0001 (architecture), ADR-0002 (creator tie-up)
+- Closes: the R0 boundary recorded in ADR-0004
+- Extends: ADR-0001 (architecture), ADR-0004 (creator tie-up)
 
 ## Context
 
-ADR-0002 recorded a boundary and left it open:
+ADR-0004 recorded a boundary and left it open:
 
 > Ordering a tie-up requires the tie-up evidence checklist on file, but
 > that checklist is operator-submitted, so it attests that a

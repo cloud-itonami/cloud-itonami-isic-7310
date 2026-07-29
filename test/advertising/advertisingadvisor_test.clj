@@ -107,9 +107,9 @@
                             [:media-plan/verify "campaign-1"]
                             [:risk/screen "campaign-1"]
                             [:actuation/place-campaign "campaign-1"]
-                            [:creator/screen "campaign-5"]
-                            [:tieup/verify "campaign-5"]
-                            [:actuation/order-creator-tieup "campaign-5"]]]
+                            [:creator/screen "campaign-21"]
+                            [:tieup/verify "campaign-21"]
+                            [:actuation/order-creator-tieup "campaign-21"]]]
         (let [p (advisor/infer db {:op op :subject subject :patch {:id subject}})]
           (is (not= :noop (:effect p)) (str op " must have a generator"))
           (is (string? (:summary p)) (str op " must produce a human-facing summary")))))))
@@ -139,18 +139,18 @@
 (deftest a-tieup-brief-reports-the-recorded-label-and-never-proposes-one
   (testing "the advisor must not author a disclosure label -- that is what makes the governor's published-label check meaningful (ADR-0002)"
     (let [db (store/seed-db)
-          p8 (advisor/infer db {:op :tieup/verify :subject "campaign-8"})
-          p9 (advisor/infer db {:op :tieup/verify :subject "campaign-9"})]
+          p8 (advisor/infer db {:op :tieup/verify :subject "campaign-24"})
+          p9 (advisor/infer db {:op :tieup/verify :subject "campaign-25"})]
       (is (nil? (get-in p8 [:value :recorded-disclosure-label]))
-          "campaign-8 records no label; the advisor must report nil, not fill one in")
+          "campaign-24 records no label; the advisor must report nil, not fill one in")
       (is (= "タイアップ" (get-in p9 [:value :recorded-disclosure-label]))
-          "campaign-9's non-compliant label is reported verbatim, not corrected")
+          "campaign-25's non-compliant label is reported verbatim, not corrected")
       (is (= (facts/accepted-disclosure-labels "JPN")
              (get-in p9 [:value :accepted-disclosure-labels]))
           "the authority's own list travels with the brief so a human can see the mismatch"))))
 
 (deftest a-tieup-brief-for-an-uncatalogued-jurisdiction-cites-nothing
-  (let [p (advisor/infer (store/seed-db) {:op :tieup/verify :subject "campaign-5" :no-spec? true})]
+  (let [p (advisor/infer (store/seed-db) {:op :tieup/verify :subject "campaign-21" :no-spec? true})]
     (is (= [] (:cites p)) "no citations -> the governor's spec-basis gate HARD-holds it")
     (is (nil? (get-in p [:value :spec-basis])))))
 

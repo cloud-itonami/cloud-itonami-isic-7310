@@ -22,31 +22,53 @@
       (is (= 900000 (:proposed-media-spend (store/campaign s "campaign-3"))))
       (is (true? (:misleading-claim-risk-unresolved? (store/campaign s "campaign-4"))))
       (is (false? (:campaign-placed? (store/campaign s "campaign-1"))))
-      (is (= ["campaign-1" "campaign-2" "campaign-3" "campaign-4"
-              "campaign-5" "campaign-6" "campaign-7" "campaign-8" "campaign-9"]
-             (mapv :id (store/all-campaigns s))))
+      (is (= ["campaign-1" "campaign-10" "campaign-11" "campaign-12" "campaign-2"
+              "campaign-21" "campaign-22" "campaign-23" "campaign-24" "campaign-25"
+              "campaign-3" "campaign-4" "campaign-5" "campaign-6" "campaign-7"
+              "campaign-8" "campaign-9"]
+             (mapv :id (store/all-campaigns s)))
+          "sorted by :id as STRINGS, so campaign-10 sorts between campaign-1 and campaign-2 -- both backends must agree on the order too")
+      (testing "media-platform facts round-trip on both backends (ADR-0002)"
+        (is (= "chatgpt-ads" (:target-platform (store/campaign s "campaign-1"))))
+        (is (= :local-services (:ad-category (store/campaign s "campaign-1"))))
+        (is (false? (:advertiser-approval-on-file? (store/campaign s "campaign-1"))))
+        (is (= {:distinguishable-from-product-ui true
+                :landing-page-consistency true
+                :advertiser-identity-verified true
+                :editorial-standards true}
+               (:attestations (store/campaign s "campaign-1")))
+            "compound attestation map survives the EDN-blob codec")
+        (is (= "google-ads" (:target-platform (store/campaign s "campaign-10"))))
+        (is (= "meta-ads" (:target-platform (store/campaign s "campaign-11"))))
+        (is (= "DEU" (:jurisdiction (store/campaign s "campaign-11"))))
+        (is (= "microsoft-advertising" (:target-platform (store/campaign s "campaign-12"))))
+        (is (= [:mental-and-personal-health]
+               (:requested-placement-contexts (store/campaign s "campaign-9")))
+            "compound context vector survives the EDN-blob codec")
+        (is (= "acme-adnet" (:target-platform (store/campaign s "campaign-5")))))
       (is (nil? (store/risk-screen-of s "campaign-1")))
       (is (nil? (store/media-plan-of s "campaign-1")))
+      (is (nil? (store/platform-check-of s "campaign-1")))
       (is (= [] (store/ledger s)))
       (is (= [] (store/placement-history s)))
       (is (zero? (store/next-placement-sequence s "JPN")))
       (is (false? (store/campaign-already-placed? s "campaign-1")))
       (testing "creator tie-up fields read back identically on both backends"
-        (is (= "@sato-bakery-review" (:creator-handle (store/campaign s "campaign-5"))))
-        (is (= :youtube (:creator-platform (store/campaign s "campaign-5"))))
-        (is (= 200000 (:creator-tieup-fee (store/campaign s "campaign-5"))))
-        (is (= "PR" (:disclosure-label (store/campaign s "campaign-5"))))
-        (is (false? (:creator-eligibility-issue? (store/campaign s "campaign-5"))))
-        (is (true? (:creator-eligibility-issue? (store/campaign s "campaign-7"))))
-        (is (nil? (:disclosure-label (store/campaign s "campaign-8"))))
-        (is (= "タイアップ" (:disclosure-label (store/campaign s "campaign-9"))))
+        (is (= "@sato-bakery-review" (:creator-handle (store/campaign s "campaign-21"))))
+        (is (= :youtube (:creator-platform (store/campaign s "campaign-21"))))
+        (is (= 200000 (:creator-tieup-fee (store/campaign s "campaign-21"))))
+        (is (= "PR" (:disclosure-label (store/campaign s "campaign-21"))))
+        (is (false? (:creator-eligibility-issue? (store/campaign s "campaign-21"))))
+        (is (true? (:creator-eligibility-issue? (store/campaign s "campaign-23"))))
+        (is (nil? (:disclosure-label (store/campaign s "campaign-24"))))
+        (is (= "タイアップ" (:disclosure-label (store/campaign s "campaign-25"))))
         (is (nil? (:creator-handle (store/campaign s "campaign-1")))
             "the placement-only campaigns carry no tie-up at all")
-        (is (nil? (store/creator-screen-of s "campaign-5")))
-        (is (nil? (store/tieup-brief-of s "campaign-5")))
+        (is (nil? (store/creator-screen-of s "campaign-21")))
+        (is (nil? (store/tieup-brief-of s "campaign-21")))
         (is (= [] (store/tieup-order-history s)))
         (is (zero? (store/next-tieup-sequence s "JPN")))
-        (is (false? (store/tieup-already-ordered? s "campaign-5")))))))
+        (is (false? (store/tieup-already-ordered? s "campaign-21")))))))
 
 (deftest write-and-ledger-parity
   (doseq [[label s] (backends)]
@@ -62,38 +84,44 @@
         (is (= {:jurisdiction "JPN" :checklist ["a" "b"]} (store/media-plan-of s "campaign-1")))
         (store/commit-record! s {:effect :risk-screen/set :path ["campaign-1"]
                                  :payload {:campaign-id "campaign-1" :verdict :resolved}})
-        (is (= {:campaign-id "campaign-1" :verdict :resolved} (store/risk-screen-of s "campaign-1"))))
+        (is (= {:campaign-id "campaign-1" :verdict :resolved} (store/risk-screen-of s "campaign-1")))
+        (store/commit-record! s {:effect :platform-check/set :path ["campaign-1"]
+                                 :payload {:platform "chatgpt-ads" :conformant? true}})
+        (is (= {:platform "chatgpt-ads" :conformant? true}
+               (store/platform-check-of s "campaign-1"))))
       (testing "campaign placement drafts a record and advances the sequence"
         (store/commit-record! s {:effect :campaign/mark-placed :path ["campaign-1"]})
         (is (= "JPN-PLC-000000" (get (first (store/placement-history s)) "record_id")))
         (is (= "campaign-placement-draft" (get (first (store/placement-history s)) "kind")))
+        (is (= "chatgpt-ads" (get (first (store/placement-history s)) "platform"))
+            "the placement record says which media platform it ran on (ADR-0002)")
         (is (true? (:campaign-placed? (store/campaign s "campaign-1"))))
         (is (= 1 (count (store/placement-history s))))
         (is (= 1 (store/next-placement-sequence s "JPN")))
         (is (true? (store/campaign-already-placed? s "campaign-1")))
         (is (false? (store/campaign-already-placed? s "campaign-2"))))
       (testing "creator-screen / tieup-brief payloads commit and read back"
-        (store/commit-record! s {:effect :creator-screen/set :path ["campaign-5"]
-                                 :payload {:campaign-id "campaign-5" :verdict :eligible}})
-        (is (= {:campaign-id "campaign-5" :verdict :eligible} (store/creator-screen-of s "campaign-5")))
-        (store/commit-record! s {:effect :tieup-brief/set :path ["campaign-5"]
+        (store/commit-record! s {:effect :creator-screen/set :path ["campaign-21"]
+                                 :payload {:campaign-id "campaign-21" :verdict :eligible}})
+        (is (= {:campaign-id "campaign-21" :verdict :eligible} (store/creator-screen-of s "campaign-21")))
+        (store/commit-record! s {:effect :tieup-brief/set :path ["campaign-21"]
                                  :payload {:jurisdiction "JPN" :checklist ["a" "b"]}})
-        (is (= {:jurisdiction "JPN" :checklist ["a" "b"]} (store/tieup-brief-of s "campaign-5")))
-        (is (nil? (store/risk-screen-of s "campaign-5"))
+        (is (= {:jurisdiction "JPN" :checklist ["a" "b"]} (store/tieup-brief-of s "campaign-21")))
+        (is (nil? (store/risk-screen-of s "campaign-21"))
             "the two screening collections are separate keyspaces"))
       (testing "creator tie-up order drafts a record and advances its OWN sequence"
-        (store/commit-record! s {:effect :tieup/mark-ordered :path ["campaign-5"]})
+        (store/commit-record! s {:effect :tieup/mark-ordered :path ["campaign-21"]})
         (is (= "JPN-TIE-000000" (get (first (store/tieup-order-history s)) "record_id")))
         (is (= "creator-tieup-order-draft" (get (first (store/tieup-order-history s)) "kind")))
         (is (= "youtube" (get (first (store/tieup-order-history s)) "platform")))
         (is (= "@sato-bakery-review" (get (first (store/tieup-order-history s)) "creator_handle")))
-        (is (true? (:tieup-ordered? (store/campaign s "campaign-5"))))
+        (is (true? (:tieup-ordered? (store/campaign s "campaign-21"))))
         (is (= 1 (count (store/tieup-order-history s))))
         (is (= 1 (store/next-tieup-sequence s "JPN")))
-        (is (true? (store/tieup-already-ordered? s "campaign-5")))
-        (is (false? (store/tieup-already-ordered? s "campaign-6"))))
+        (is (true? (store/tieup-already-ordered? s "campaign-21")))
+        (is (false? (store/tieup-already-ordered? s "campaign-22"))))
       (testing "the two actuations keep separate guards, sequences and histories"
-        (is (false? (store/campaign-already-placed? s "campaign-5"))
+        (is (false? (store/campaign-already-placed? s "campaign-21"))
             "ordering a tie-up must not mark the campaign placed")
         (is (false? (store/tieup-already-ordered? s "campaign-1"))
             "placing campaign-1 above must not mark a tie-up ordered")

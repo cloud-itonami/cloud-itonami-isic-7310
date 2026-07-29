@@ -1,8 +1,8 @@
-# ADR-0002: Creator tie-up (YouTube / influencer) as a second governed actuation
+# ADR-0004: Creator tie-up (YouTube / influencer) as a second governed actuation
 
 - Status: accepted
 - Date: 2026-07-29
-- Supersedes: nothing. Extends ADR-0001 (architecture).
+- Supersedes: nothing. Extends ADR-0001 (architecture); orthogonal to ADR-0002/0003 (media-platform layer), which govern campaign placement rather than creator engagement.
 
 ## Context
 

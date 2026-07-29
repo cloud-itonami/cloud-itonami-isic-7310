@@ -40,11 +40,14 @@
 
 (defn- verify!
   "Everything `:actuation/place-campaign` requires before it can even
-  reach a human: a committed media-plan assessment AND a committed
-  resolved risk screening (ADR-0003)."
+  reach a human: a committed media-plan assessment, a committed media-
+  platform conformance assessment (ADR-0002) AND a committed resolved
+  risk screening (ADR-0005)."
   [actor tid-prefix subject]
   (exec-op actor (str tid-prefix "-v") {:op :media-plan/verify :subject subject} operator)
   (resume! actor (str tid-prefix "-v") :approved)
+  (exec-op actor (str tid-prefix "-pv") {:op :platform/verify :subject subject} operator)
+  (resume! actor (str tid-prefix "-pv") :approved)
   (exec-op actor (str tid-prefix "-s") {:op :risk/screen :subject subject} operator)
   (resume! actor (str tid-prefix "-s") :approved))
 
@@ -75,12 +78,12 @@
 (deftest rejecting-a-creator-tieup-order-writes-nothing
   (testing "the same veto on the second actuation -- a creator must not be commissioned over an operator's objection"
     (let [[db actor] (fresh)
-          _ (brief! actor "r2" "campaign-5")
-          r1 (exec-op actor "r2" {:op :actuation/order-creator-tieup :subject "campaign-5"} operator)]
+          _ (brief! actor "r2" "campaign-21")
+          r1 (exec-op actor "r2" {:op :actuation/order-creator-tieup :subject "campaign-21"} operator)]
       (is (= :interrupted (:status r1)))
       (let [r2 (resume! actor "r2" :rejected)]
         (is (= :hold (get-in r2 [:state :disposition])))
-        (is (false? (:tieup-ordered? (store/campaign db "campaign-5"))))
+        (is (false? (:tieup-ordered? (store/campaign db "campaign-21"))))
         (is (empty? (store/tieup-order-history db)))))))
 
 (deftest a-rejection-is-auditable-under-its-own-basis
@@ -152,9 +155,10 @@
         ctx (at-phase 2)]
     (testing "both screening/brief ops become writable together"
       (doseq [[tid op subject] [["p2a" :media-plan/verify "campaign-1"]
+                                ["p2pv" :platform/verify "campaign-1"]
                                 ["p2b" :risk/screen "campaign-1"]
-                                ["p2c" :creator/screen "campaign-5"]
-                                ["p2d" :tieup/verify "campaign-5"]]]
+                                ["p2c" :creator/screen "campaign-21"]
+                                ["p2d" :tieup/verify "campaign-21"]]]
         (is (= :interrupted (:status (exec-op actor tid {:op op :subject subject} ctx)))
             (str op " should be writable-with-approval at phase 2"))
         (resume! actor tid :approved)))
@@ -165,7 +169,7 @@
     ;; :evidence-incomplete first and this test would prove nothing.
     (testing "neither actuation is reachable at phase 2, even with evidence on file"
       (doseq [[tid op subject] [["p2e" :actuation/place-campaign "campaign-1"]
-                                ["p2f" :actuation/order-creator-tieup "campaign-5"]]]
+                                ["p2f" :actuation/order-creator-tieup "campaign-21"]]]
         (let [res (exec-op actor tid {:op op :subject subject} ctx)]
           (is (= :hold (get-in res [:state :disposition])) (str op))
           (is (= :phase-disabled (:phase-reason (last (store/ledger db)))) (str op))))

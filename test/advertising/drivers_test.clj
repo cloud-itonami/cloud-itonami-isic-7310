@@ -20,10 +20,21 @@
             [advertising.store :as store]))
 
 (def ^:private expected-hold-bases
-  "Every HARD-hold rule the drivers claim to demonstrate. If a rule is
-  renamed or stops firing, the demo stops demonstrating it -- and this
-  set is what notices."
+  "Every rule the Campaign Governor can raise -- jurisdiction-side,
+  media-platform-side (ADR-0002/0003) and creator-tie-up-side
+  (ADR-0004/0005) -- plus both double-actuation guards. The demo
+  demonstrates ALL of them: a rule with no demo case is a rule the
+  operator console never shows and a reader never sees fire. If one is
+  renamed or stops firing, this set is what notices."
   #{:no-spec-basis
+    :evidence-incomplete
+    :tieup-evidence-incomplete
+    :no-platform-policy-basis
+    :platform-check-incomplete
+    :platform-prohibited-category
+    :platform-restricted-category-unapproved
+    :platform-attestation-missing
+    :sensitive-placement-context
     :media-spend-exceeds-authorized-budget
     :misleading-claim-risk-unresolved
     :already-placed
@@ -49,13 +60,13 @@
     (is (= 1 (count (store/placement-history db))) "one approved campaign placement")
     (is (= 1 (count (store/tieup-order-history db))) "one approved creator tie-up order")
     (is (true? (:campaign-placed? (store/campaign db "campaign-1"))))
-    (is (true? (:tieup-ordered? (store/campaign db "campaign-5"))))
+    (is (true? (:tieup-ordered? (store/campaign db "campaign-21"))))
     (testing "and nothing else actuated"
       (doseq [c (store/all-campaigns db)
               :when (not= "campaign-1" (:id c))]
         (is (false? (:campaign-placed? c)) (str (:id c) " must not be placed")))
       (doseq [c (store/all-campaigns db)
-              :when (not= "campaign-5" (:id c))]
+              :when (not= "campaign-21" (:id c))]
         (is (false? (:tieup-ordered? c)) (str (:id c) " must not be ordered"))))))
 
 (deftest the-console-reports-the-real-store-not-a-fixture
@@ -68,7 +79,7 @@
       (is (str/includes? html "JPN-TIE-000000")))
     (testing "the tie-up table distinguishes a published label from a merely-recorded one"
       (is (str/includes? html "not a published label")
-          "campaign-9's 「タイアップ」 must be shown as non-compliant, not as a label")
+          "campaign-25's 「タイアップ」 must be shown as non-compliant, not as a label")
       (is (str/includes? html "@sato-bakery-review")))
     (testing "hold reasons are surfaced to the operator, not swallowed"
       (doseq [rule expected-hold-bases]
