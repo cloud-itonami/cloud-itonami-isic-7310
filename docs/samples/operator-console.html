@@ -2473,48 +2473,85 @@ img,svg { max-width: 100%; height: auto; }</style></head><body>
 <tr><td><code>campaign-11</code></td><td>Berliner Möbelhaus</td><td>DEU</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: platform-attestation-missing</td></tr>
 <tr><td><code>campaign-12</code></td><td>Hokkaido Onsen Tours</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: platform-restricted-category-unapproved</td></tr>
 <tr><td><code>campaign-2</code></td><td>Atlantis Goods</td><td>ATL</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: no-spec-basis</td></tr>
+<tr><td><code>campaign-21</code></td><td>Sato Bakery</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: already-ordered</td></tr>
+<tr><td><code>campaign-22</code></td><td>関西グルメ舎</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: creator-tieup-fee-exceeds-authorized-budget</td></tr>
+<tr><td><code>campaign-23</code></td><td>北野デンタル</td><td>JPN</td><td>300000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: creator-ineligible</td></tr>
+<tr><td><code>campaign-24</code></td><td>みどり不動産</td><td>JPN</td><td>300000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: sponsorship-disclosure-missing</td></tr>
+<tr><td><code>campaign-25</code></td><td>湘南サーフ用品</td><td>JPN</td><td>300000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: sponsorship-disclosure-missing</td></tr>
 <tr><td><code>campaign-3</code></td><td>鈴木工務店</td><td>JPN</td><td>900000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: media-spend-exceeds-authorized-budget</td></tr>
 <tr><td><code>campaign-4</code></td><td>田中青果</td><td>JPN</td><td>500000</td><td>800000</td><td class="err">unresolved</td><td class="muted">not placed</td><td class="err">governor-hold: misleading-claim-risk-unresolved</td></tr>
 <tr><td><code>campaign-5</code></td><td>Kaneko Tools</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: no-platform-policy-basis</td></tr>
-<tr><td><code>campaign-6</code></td><td>Lucky Palace</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: platform-check-incomplete,platform-prohibited-category</td></tr>
+<tr><td><code>campaign-6</code></td><td>Lucky Palace</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: risk-screen-missing,platform-check-incomplete,platform-prohibited-category</td></tr>
 <tr><td><code>campaign-7</code></td><td>Marunouchi Lending</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: platform-restricted-category-unapproved</td></tr>
 <tr><td><code>campaign-8</code></td><td>Yamada Travel</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: platform-attestation-missing</td></tr>
 <tr><td><code>campaign-9</code></td><td>Aoi Clinic Supplies</td><td>JPN</td><td>500000</td><td>800000</td><td class="muted">none</td><td class="muted">not placed</td><td class="err">governor-hold: sensitive-placement-context</td></tr>
 </tbody></table>
+<h2>Creator tie-up (YouTube / influencer) directory (post-scenario)</h2>
+<p class="lede">Sponsorship-disclosure labels are checked against <code>advertising.facts/accepted-disclosure-labels</code> -- the wordings the jurisdiction&#39;s OWN authority publishes. A recorded-but-unpublished label (e.g. 「タイアップ」 in JPN) is the same HARD hold as none at all.</p>
+<table><thead><tr><th>id</th><th>client</th><th>creator</th><th>platform</th><th>tie-up fee</th><th>combined spend / authorized</th><th>creator eligibility</th><th>disclosure label</th><th>tie-up order</th></tr></thead><tbody>
+<tr><td><code>campaign-21</code></td><td>Sato Bakery</td><td><code>@sato-bakery-review</code></td><td>youtube</td><td>200000</td><td>700000 / 800000</td><td class="muted">no issue</td><td class="ok">PR</td><td class="ok">ordered (JPN-TIE-000000)</td></tr>
+<tr><td><code>campaign-22</code></td><td>関西グルメ舎</td><td><code>@kansai-gourmet</code></td><td>youtube</td><td>400000</td><td>900000 / 800000</td><td class="muted">no issue</td><td class="ok">PR</td><td class="muted">not ordered</td></tr>
+<tr><td><code>campaign-23</code></td><td>北野デンタル</td><td><code>@kitano-clinic-fan</code></td><td>instagram</td><td>100000</td><td>400000 / 800000</td><td class="err">ineligible</td><td class="ok">PR</td><td class="muted">not ordered</td></tr>
+<tr><td><code>campaign-24</code></td><td>みどり不動産</td><td><code>@midori-room-tour</code></td><td>youtube</td><td>100000</td><td>400000 / 800000</td><td class="muted">no issue</td><td class="err">none recorded</td><td class="muted">not ordered</td></tr>
+<tr><td><code>campaign-25</code></td><td>湘南サーフ用品</td><td><code>@shonan-surf-log</code></td><td>youtube</td><td>100000</td><td>400000 / 800000</td><td class="muted">no issue</td><td class="err">タイアップ -- not a published label</td><td class="muted">not ordered</td></tr>
+</tbody></table>
 <h2>Action gate (advertising.phase x advertising.governor/high-stakes)</h2>
 <table><thead><tr><th>phase</th><th>label</th><th>writes allowed</th><th>auto-commit eligible (governor-clean)</th><th>always-escalate (high-stakes)</th></tr></thead><tbody>
-<tr><td>0</td><td>read-only</td><td><span class="muted">none</span></td><td><span class="muted">none -- human approval required</span></td><td>place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
-<tr><td>1</td><td>assisted-intake</td><td>intake</td><td><span class="muted">none -- human approval required</span></td><td>place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
-<tr><td>2</td><td>assisted-verify</td><td>intake, screen, verify, verify</td><td><span class="muted">none -- human approval required</span></td><td>place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
-<tr><td>3</td><td>supervised-auto</td><td>intake, place-campaign, screen, verify, verify</td><td>intake</td><td>place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
+<tr><td>0</td><td>read-only</td><td><span class="muted">none</span></td><td><span class="muted">none -- human approval required</span></td><td>order-creator-tieup, place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
+<tr><td>1</td><td>assisted-intake</td><td>intake</td><td><span class="muted">none -- human approval required</span></td><td>order-creator-tieup, place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
+<tr><td>2</td><td>assisted-verify</td><td>intake, screen, screen, verify, verify, verify</td><td><span class="muted">none -- human approval required</span></td><td>order-creator-tieup, place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
+<tr><td>3</td><td>supervised-auto</td><td>intake, order-creator-tieup, place-campaign, screen, screen, verify, verify, verify</td><td>intake</td><td>order-creator-tieup, place-campaign <span class="muted">(never auto-eligible, at any phase)</span></td></tr>
 </tbody></table>
 <h2>Audit ledger (append-only, advertising.store/ledger)</h2>
 <table><thead><tr><th>#</th><th>op</th><th>subject</th><th>actor</th><th>disposition</th><th>basis / hold rules</th><th>confidence</th></tr></thead><tbody>
 <tr><td>1</td><td><code>intake</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>id, client-name</td><td><span class="muted">--</span></td></tr>
-<tr><td>2</td><td><code>verify</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>不当景品類及び不当表示防止法 (Act against Unjustifiable Premiums and Misleading Representations, 景品表示法), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
-<tr><td>3</td><td><code>verify</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>OpenAI 広告ポリシー (OpenAI Ad policies), https://openai.com/policies/ad-policies/</td><td><span class="muted">--</span></td></tr>
-<tr><td>4</td><td><code>screen</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>misleading-claim-check</td><td><span class="muted">--</span></td></tr>
-<tr><td>5</td><td><code>place-campaign</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>campaign-1</td><td><span class="muted">--</span></td></tr>
-<tr><td>6</td><td><code>verify</code></td><td><code>campaign-2</code></td><td>op-1</td><td class="err">hold</td><td>no-spec-basis</td><td>0.9</td></tr>
-<tr><td>7</td><td><code>verify</code></td><td><code>campaign-3</code></td><td>op-1</td><td class="ok">commit</td><td>不当景品類及び不当表示防止法 (Act against Unjustifiable Premiums and Misleading Representations, 景品表示法), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
-<tr><td>8</td><td><code>verify</code></td><td><code>campaign-3</code></td><td>op-1</td><td class="ok">commit</td><td>OpenAI 広告ポリシー (OpenAI Ad policies), https://openai.com/policies/ad-policies/</td><td><span class="muted">--</span></td></tr>
-<tr><td>9</td><td><code>place-campaign</code></td><td><code>campaign-3</code></td><td>op-1</td><td class="err">hold</td><td>media-spend-exceeds-authorized-budget</td><td>0.3</td></tr>
-<tr><td>10</td><td><code>screen</code></td><td><code>campaign-4</code></td><td>op-1</td><td class="err">hold</td><td>misleading-claim-risk-unresolved</td><td>0.95</td></tr>
-<tr><td>11</td><td><code>place-campaign</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="err">hold</td><td>already-placed</td><td>0.9</td></tr>
-<tr><td>12</td><td><code>verify</code></td><td><code>campaign-5</code></td><td>op-1</td><td class="err">hold</td><td>no-platform-policy-basis</td><td>0.9</td></tr>
-<tr><td>13</td><td><code>verify</code></td><td><code>campaign-6</code></td><td>op-1</td><td class="err">hold</td><td>platform-prohibited-category</td><td>0.9</td></tr>
-<tr><td>14</td><td><code>verify</code></td><td><code>campaign-7</code></td><td>op-1</td><td class="err">hold</td><td>platform-restricted-category-unapproved</td><td>0.9</td></tr>
-<tr><td>15</td><td><code>verify</code></td><td><code>campaign-8</code></td><td>op-1</td><td class="err">hold</td><td>platform-attestation-missing</td><td>0.9</td></tr>
-<tr><td>16</td><td><code>verify</code></td><td><code>campaign-9</code></td><td>op-1</td><td class="err">hold</td><td>sensitive-placement-context</td><td>0.9</td></tr>
-<tr><td>17</td><td><code>verify</code></td><td><code>campaign-10</code></td><td>op-1</td><td class="ok">commit</td><td>Google 広告のポリシー (Google Ads policies), https://support.google.com/adspolicy/answer/6008942</td><td><span class="muted">--</span></td></tr>
-<tr><td>18</td><td><code>verify</code></td><td><code>campaign-11</code></td><td>op-1</td><td class="err">hold</td><td>platform-attestation-missing</td><td>0.9</td></tr>
-<tr><td>19</td><td><code>verify</code></td><td><code>campaign-12</code></td><td>op-1</td><td class="err">hold</td><td>platform-restricted-category-unapproved</td><td>0.9</td></tr>
-<tr><td>20</td><td><code>verify</code></td><td><code>campaign-6</code></td><td>op-1</td><td class="ok">commit</td><td>不当景品類及び不当表示防止法 (Act against Unjustifiable Premiums and Misleading Representations, 景品表示法), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
-<tr><td>21</td><td><code>place-campaign</code></td><td><code>campaign-6</code></td><td>op-1</td><td class="err">hold</td><td>platform-check-incomplete, platform-prohibited-category</td><td>0.9</td></tr>
+<tr><td>2</td><td><code>place-campaign</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="err">hold</td><td>evidence-incomplete, risk-screen-missing, platform-check-incomplete</td><td>0.9</td></tr>
+<tr><td>3</td><td><code>verify</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>不当景品類及び不当表示防止法 (Act against Unjustifiable Premiums and Misleading Representations, 景品表示法), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
+<tr><td>4</td><td><code>verify</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>OpenAI 広告ポリシー (OpenAI Ad policies), https://openai.com/policies/ad-policies/</td><td><span class="muted">--</span></td></tr>
+<tr><td>5</td><td><code>screen</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>misleading-claim-check</td><td><span class="muted">--</span></td></tr>
+<tr><td>6</td><td><code>place-campaign</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="ok">commit</td><td>campaign-1</td><td><span class="muted">--</span></td></tr>
+<tr><td>7</td><td><code>verify</code></td><td><code>campaign-2</code></td><td>op-1</td><td class="err">hold</td><td>no-spec-basis</td><td>0.9</td></tr>
+<tr><td>8</td><td><code>verify</code></td><td><code>campaign-3</code></td><td>op-1</td><td class="ok">commit</td><td>不当景品類及び不当表示防止法 (Act against Unjustifiable Premiums and Misleading Representations, 景品表示法), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
+<tr><td>9</td><td><code>verify</code></td><td><code>campaign-3</code></td><td>op-1</td><td class="ok">commit</td><td>OpenAI 広告ポリシー (OpenAI Ad policies), https://openai.com/policies/ad-policies/</td><td><span class="muted">--</span></td></tr>
+<tr><td>10</td><td><code>place-campaign</code></td><td><code>campaign-3</code></td><td>op-1</td><td class="err">hold</td><td>media-spend-exceeds-authorized-budget, risk-screen-missing</td><td>0.3</td></tr>
+<tr><td>11</td><td><code>screen</code></td><td><code>campaign-3</code></td><td>op-1</td><td class="ok">commit</td><td>misleading-claim-check</td><td><span class="muted">--</span></td></tr>
+<tr><td>12</td><td><code>place-campaign</code></td><td><code>campaign-3</code></td><td>op-1</td><td class="err">hold</td><td>media-spend-exceeds-authorized-budget</td><td>0.3</td></tr>
+<tr><td>13</td><td><code>screen</code></td><td><code>campaign-4</code></td><td>op-1</td><td class="err">hold</td><td>misleading-claim-risk-unresolved</td><td>0.95</td></tr>
+<tr><td>14</td><td><code>place-campaign</code></td><td><code>campaign-1</code></td><td>op-1</td><td class="err">hold</td><td>already-placed</td><td>0.9</td></tr>
+<tr><td>15</td><td><code>screen</code></td><td><code>campaign-21</code></td><td>op-1</td><td class="ok">commit</td><td>creator-eligibility-check, @sato-bakery-review</td><td><span class="muted">--</span></td></tr>
+<tr><td>16</td><td><code>order-creator-tieup</code></td><td><code>campaign-21</code></td><td>op-1</td><td class="err">hold</td><td>tieup-evidence-incomplete</td><td>0.9</td></tr>
+<tr><td>17</td><td><code>verify</code></td><td><code>campaign-21</code></td><td>op-1</td><td class="ok">commit</td><td>景品表示法第5条第3号に基づく指定告示「一般消費者が事業者の表示であることを判別することが困難である表示」(令和5年内閣府告示第19号、いわゆるステルスマーケティング規制), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
+<tr><td>18</td><td><code>order-creator-tieup</code></td><td><code>campaign-21</code></td><td>op-1</td><td class="ok">commit</td><td>campaign-21, @sato-bakery-review</td><td><span class="muted">--</span></td></tr>
+<tr><td>19</td><td><code>verify</code></td><td><code>campaign-22</code></td><td>op-1</td><td class="ok">commit</td><td>景品表示法第5条第3号に基づく指定告示「一般消費者が事業者の表示であることを判別することが困難である表示」(令和5年内閣府告示第19号、いわゆるステルスマーケティング規制), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
+<tr><td>20</td><td><code>order-creator-tieup</code></td><td><code>campaign-22</code></td><td>op-1</td><td class="err">hold</td><td>creator-screen-missing, creator-tieup-fee-exceeds-authorized-budget</td><td>0.3</td></tr>
+<tr><td>21</td><td><code>screen</code></td><td><code>campaign-22</code></td><td>op-1</td><td class="ok">commit</td><td>creator-eligibility-check, @kansai-gourmet</td><td><span class="muted">--</span></td></tr>
+<tr><td>22</td><td><code>order-creator-tieup</code></td><td><code>campaign-22</code></td><td>op-1</td><td class="err">hold</td><td>creator-tieup-fee-exceeds-authorized-budget</td><td>0.3</td></tr>
+<tr><td>23</td><td><code>screen</code></td><td><code>campaign-23</code></td><td>op-1</td><td class="err">hold</td><td>creator-ineligible</td><td>0.95</td></tr>
+<tr><td>24</td><td><code>verify</code></td><td><code>campaign-24</code></td><td>op-1</td><td class="ok">commit</td><td>景品表示法第5条第3号に基づく指定告示「一般消費者が事業者の表示であることを判別することが困難である表示」(令和5年内閣府告示第19号、いわゆるステルスマーケティング規制), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
+<tr><td>25</td><td><code>screen</code></td><td><code>campaign-24</code></td><td>op-1</td><td class="ok">commit</td><td>creator-eligibility-check, @midori-room-tour</td><td><span class="muted">--</span></td></tr>
+<tr><td>26</td><td><code>order-creator-tieup</code></td><td><code>campaign-24</code></td><td>op-1</td><td class="err">hold</td><td>sponsorship-disclosure-missing</td><td>0.9</td></tr>
+<tr><td>27</td><td><code>verify</code></td><td><code>campaign-25</code></td><td>op-1</td><td class="ok">commit</td><td>景品表示法第5条第3号に基づく指定告示「一般消費者が事業者の表示であることを判別することが困難である表示」(令和5年内閣府告示第19号、いわゆるステルスマーケティング規制), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
+<tr><td>28</td><td><code>screen</code></td><td><code>campaign-25</code></td><td>op-1</td><td class="ok">commit</td><td>creator-eligibility-check, @shonan-surf-log</td><td><span class="muted">--</span></td></tr>
+<tr><td>29</td><td><code>order-creator-tieup</code></td><td><code>campaign-25</code></td><td>op-1</td><td class="err">hold</td><td>sponsorship-disclosure-missing</td><td>0.9</td></tr>
+<tr><td>30</td><td><code>order-creator-tieup</code></td><td><code>campaign-21</code></td><td>op-1</td><td class="err">hold</td><td>already-ordered</td><td>0.9</td></tr>
+<tr><td>31</td><td><code>verify</code></td><td><code>campaign-5</code></td><td>op-1</td><td class="err">hold</td><td>no-platform-policy-basis</td><td>0.9</td></tr>
+<tr><td>32</td><td><code>verify</code></td><td><code>campaign-6</code></td><td>op-1</td><td class="err">hold</td><td>platform-prohibited-category</td><td>0.9</td></tr>
+<tr><td>33</td><td><code>verify</code></td><td><code>campaign-7</code></td><td>op-1</td><td class="err">hold</td><td>platform-restricted-category-unapproved</td><td>0.9</td></tr>
+<tr><td>34</td><td><code>verify</code></td><td><code>campaign-8</code></td><td>op-1</td><td class="err">hold</td><td>platform-attestation-missing</td><td>0.9</td></tr>
+<tr><td>35</td><td><code>verify</code></td><td><code>campaign-9</code></td><td>op-1</td><td class="err">hold</td><td>sensitive-placement-context</td><td>0.9</td></tr>
+<tr><td>36</td><td><code>verify</code></td><td><code>campaign-10</code></td><td>op-1</td><td class="ok">commit</td><td>Google 広告のポリシー (Google Ads policies), https://support.google.com/adspolicy/answer/6008942</td><td><span class="muted">--</span></td></tr>
+<tr><td>37</td><td><code>verify</code></td><td><code>campaign-11</code></td><td>op-1</td><td class="err">hold</td><td>platform-attestation-missing</td><td>0.9</td></tr>
+<tr><td>38</td><td><code>verify</code></td><td><code>campaign-12</code></td><td>op-1</td><td class="err">hold</td><td>platform-restricted-category-unapproved</td><td>0.9</td></tr>
+<tr><td>39</td><td><code>verify</code></td><td><code>campaign-6</code></td><td>op-1</td><td class="ok">commit</td><td>不当景品類及び不当表示防止法 (Act against Unjustifiable Premiums and Misleading Representations, 景品表示法), https://www.caa.go.jp/policies/policy/representation/</td><td><span class="muted">--</span></td></tr>
+<tr><td>40</td><td><code>place-campaign</code></td><td><code>campaign-6</code></td><td>op-1</td><td class="err">hold</td><td>risk-screen-missing, platform-check-incomplete, platform-prohibited-category</td><td>0.9</td></tr>
 </tbody></table>
 <h2>Draft campaign-placement records (advertising.registry, unsigned)</h2>
 <table><thead><tr><th>record_id</th><th>campaign_id</th><th>jurisdiction</th><th>kind</th></tr></thead><tbody>
 <tr><td><code>JPN-PLC-000000</code></td><td><code>campaign-1</code></td><td>JPN</td><td>campaign-placement-draft</td></tr>
+</tbody></table>
+<h2>Draft creator-tie-up order records (advertising.registry, unsigned)</h2>
+<table><thead><tr><th>record_id</th><th>campaign_id</th><th>jurisdiction</th><th>platform</th><th>creator_handle</th><th>kind</th></tr></thead><tbody>
+<tr><td><code>JPN-TIE-000000</code></td><td><code>campaign-21</code></td><td>JPN</td><td>youtube</td><td><code>@sato-bakery-review</code></td><td>creator-tieup-order-draft</td></tr>
 </tbody></table>
 <footer>Source: <code>src/advertising/render_html.clj</code> via <code>clojure -M:dev:render-html</code>. Nightly regeneration: <code>.github/workflows/regenerate.yml</code>.</footer>
 </body></html>

@@ -33,6 +33,14 @@ io.github.com-junkawasaki/langgraph-clj
                       {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
          :main-opts ["-m" "cognitect.test-runner"]
          :exec-fn cognitect.test-runner.api/test}
+  ;; clojure -M:dev:coverage -> real line/form coverage over src, measured by
+  ;; running THIS repo's own test suite. The number quoted in README `Run` is
+  ;; this command's output, never a hand-typed estimate.
+  :coverage {:extra-paths ["test"]
+             :extra-deps {cloverage/cloverage {:mvn/version "1.2.4"}}
+             :main-opts ["-m" "cloverage.coverage"
+                         "-p" "src" "-s" "test"
+                         "--text"]}
   ;; static analysis -- clj-kondo from deps (no binary), errors fail CI.
   :lint {:replace-deps {clj-kondo/clj-kondo {:mvn/version "2024.11.14"}}
          :main-opts    ["-m" "clj-kondo.main"

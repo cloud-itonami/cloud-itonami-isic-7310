@@ -4,13 +4,17 @@
 
   It normalizes campaign-intake, drafts a per-jurisdiction
   advertising-standards evidence checklist, screens campaigns for an
-  unresolved misleading-claim risk, and drafts the campaign-placement
-  action. CRITICAL: it is a smart-but-untrusted advisor. It returns a
-  *proposal* (with a rationale + the fields it cited), never a
-  committed record or a real campaign placement. Every output is
-  censored downstream by `advertising.governor` before anything
-  touches the SSoT, and `:actuation/place-campaign` proposals NEVER
-  auto-commit at any phase -- see README `Actuation`.
+  unresolved misleading-claim risk, screens the YouTube channel /
+  influencer a campaign wants to commission for eligibility, drafts
+  the creator-tie-up evidence checklist, and drafts BOTH real-world
+  actions (campaign placement; creator-tie-up order). CRITICAL: it is
+  a smart-but-untrusted advisor. It returns a *proposal* (with a
+  rationale + the fields it cited), never a committed record, a real
+  campaign placement or a real order sent to a creator. Every output
+  is censored downstream by `advertising.governor` before anything
+  touches the SSoT, and neither `:actuation/place-campaign` nor
+  `:actuation/order-creator-tieup` proposals EVER auto-commit at any
+  phase -- see README `Actuation`.
 
   Like every sibling actor's advisor, this is a deterministic mock so
   the actor graph runs offline and the governor contract is exercised
@@ -22,7 +26,8 @@
      :rationale  str            ; why -- SCANNED by the spec-basis gate
      :cites      [kw|str ..]    ; facts/sources the LLM used -- SCANNED too
      :effect     kw             ; how a commit would mutate the SSoT
-     :stake      kw|nil         ; :actuation/place-campaign | nil
+     :stake      kw|nil         ; :actuation/place-campaign |
+                                ; :actuation/order-creator-tieup | nil
      :confidence 0..1}"
   (:require #?(:clj  [clojure.edn :as edn]
                :cljs [cljs.reader :as edn])
@@ -181,6 +186,122 @@
      :stake      :actuation/place-campaign
      :confidence (if (and c (not (registry/media-spend-exceeds-authorized-budget? c))) 0.9 0.3)}))
 
+;; -------------------- creator tie-up (YouTube / influencer) --------------------
+
+(defn- screen-creator
+  "Creator-eligibility screening draft for the YouTube channel /
+  influencer a campaign wants to commission. `:creator-eligibility-
+  issue?` on the campaign record injects the failure mode: the
+  Campaign Governor must HOLD, un-overridably, on any unresolved
+  eligibility issue -- the tie-up analog of `screen-misleading-claim-
+  risk`."
+  [db {:keys [subject]}]
+  (let [c (store/campaign db subject)]
+    (cond
+      (nil? c)
+      {:summary "対象案件記録が見つかりません" :rationale "no campaign record"
+       :cites [] :effect :creator-screen/set :value {:campaign-id subject :verdict :unknown}
+       :stake nil :confidence 0.0}
+
+      (nil? (:creator-handle c))
+      {:summary (str subject " に起用予定クリエイターが記録されていません")
+       :rationale "creator-handle 未記録の案件は適格性審査の対象にできない。"
+       :cites [] :effect :creator-screen/set
+       :value {:campaign-id subject :verdict :unknown}
+       :stake nil :confidence 0.0}
+
+      (true? (:creator-eligibility-issue? c))
+      {:summary    (str (:creator-handle c) " (" (name (:creator-platform c))
+                        "): 未解決の適格性問題を検出")
+       :rationale  "適格性スクリーニングが未解決の問題を検出。人手確認とホールドが必須。"
+       :cites      [:creator-eligibility-check (:creator-handle c)]
+       :effect     :creator-screen/set
+       :value      {:campaign-id subject :verdict :ineligible
+                    :creator-handle (:creator-handle c)
+                    :platform (:creator-platform c)}
+       :stake      nil
+       :confidence 0.95}
+
+      :else
+      {:summary    (str (:creator-handle c) " (" (name (:creator-platform c))
+                        "): 未解決の適格性問題なし")
+       :rationale  "クリエイター適格性スクリーニング完了。"
+       :cites      [:creator-eligibility-check (:creator-handle c)]
+       :effect     :creator-screen/set
+       :value      {:campaign-id subject :verdict :eligible
+                    :creator-handle (:creator-handle c)
+                    :platform (:creator-platform c)}
+       :stake      nil
+       :confidence 0.9})))
+
+(defn- verify-tieup-brief
+  "Per-jurisdiction creator-tie-up evidence checklist draft, citing the
+  jurisdiction's SPONSORSHIP-DISCLOSURE basis specifically (not the
+  general advertising-standards one) -- an operator disputing a tie-up
+  order needs that citation. `:no-spec?` injects the same failure mode
+  `verify-media-plan` defends against: proposing a checklist for a
+  jurisdiction with NO official basis in `advertising.facts`.
+
+  Note what this proposal does NOT do: it reports the campaign's
+  recorded disclosure label verbatim and never proposes one. Choosing
+  a disclosure wording for a client is a legal act; the governor
+  checks the recorded label against the authority's own published
+  examples, and an advisor that invented a plausible-looking label
+  would defeat exactly that check."
+  [db {:keys [subject no-spec?]}]
+  (let [c (store/campaign db subject)
+        iso3 (if no-spec? "ATL" (:jurisdiction c))
+        disc (facts/disclosure-basis iso3)]
+    (if (nil? disc)
+      {:summary    (str iso3 " の公式な開示表示(スポンサーシップ開示)基準が見つかりません")
+       :rationale  "advertising.facts に未登録の法域。要件を推測で作らない。"
+       :cites      []
+       :effect     :tieup-brief/set
+       :value      {:jurisdiction iso3 :checklist [] :spec-basis nil}
+       :stake      nil
+       :confidence 0.9}
+      {:summary    (str iso3 " (" (:owner-authority disc) ") 向けタイアップ必要書類 "
+                        (count (facts/tieup-evidence-checklist iso3)) " 件を提案")
+       :rationale  (str "公式ソース: " (:provenance disc) " / 法的根拠: " (:legal-basis disc)
+                        " / 記録済み開示表示: " (pr-str (:disclosure-label c)))
+       :cites      [(:legal-basis disc) (:provenance disc)]
+       :effect     :tieup-brief/set
+       :value      {:jurisdiction iso3
+                    :checklist (facts/tieup-evidence-checklist iso3)
+                    :spec-basis (:provenance disc)
+                    :legal-basis (:legal-basis disc)
+                    :recorded-disclosure-label (:disclosure-label c)
+                    :accepted-disclosure-labels (facts/accepted-disclosure-labels iso3)}
+       :stake      nil
+       :confidence 0.9})))
+
+(defn- propose-creator-tieup-order
+  "Draft the actual CREATOR-TIE-UP ORDER action -- commissioning a paid
+  post from a named YouTube channel / influencer on the client's
+  behalf. ALWAYS `:stake :actuation/order-creator-tieup` -- this is a
+  REAL-WORLD act against a third party, never a draft the actor may
+  auto-run. See README `Actuation`: no phase ever adds this op to a
+  phase's `:auto` set (`advertising.phase`); the governor also always
+  escalates on it. Two independent layers agree, deliberately."
+  [db {:keys [subject]}]
+  (let [c (store/campaign db subject)]
+    {:summary    (str subject " 向けクリエイタータイアップ発注提案"
+                      (when c (str " (" (:creator-handle c)
+                                   " / " (some-> (:creator-platform c) name) ")")))
+     :rationale  (if c
+                   (str "media-spend=" (:proposed-media-spend c)
+                        " tieup-fee=" (:creator-tieup-fee c)
+                        " authorized-budget=" (:authorized-budget c)
+                        " disclosure-label=" (pr-str (:disclosure-label c)))
+                   "案件記録が見つかりません")
+     :cites      (if c [subject (:creator-handle c)] [])
+     :effect     :tieup/mark-ordered
+     :value      {:campaign-id subject
+                  :creator-handle (:creator-handle c)
+                  :platform (:creator-platform c)}
+     :stake      :actuation/order-creator-tieup
+     :confidence (if (and c (not (registry/creator-tieup-fee-exceeds-authorized-budget? c))) 0.9 0.3)}))
+
 (defn infer
   "Route a request to the right proposal generator.
   request: {:op kw :subject id ...op-specific...}"
@@ -191,6 +312,9 @@
     :platform/verify                  (verify-platform db request)
     :risk/screen                      (screen-misleading-claim-risk db request)
     :actuation/place-campaign          (propose-campaign-placement db request)
+    :creator/screen                   (screen-creator db request)
+    :tieup/verify                     (verify-tieup-brief db request)
+    :actuation/order-creator-tieup     (propose-creator-tieup-order db request)
     {:summary "未対応の操作" :rationale (str op) :cites []
      :effect :noop :stake nil :confidence 0.0}))
 
