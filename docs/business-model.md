@@ -56,6 +56,10 @@
 - creator-tie-up ordering is logged and escalated, and cannot be finalized
   twice for the same campaign, off a guard fully independent of the placement
   guard
+- neither a campaign nor a creator tie-up can be actuated with NO screening on
+  file at all: a committed verdict that actually clears is required, because
+  "we never looked" carries the same exposure as "we looked and found
+  something" with no record that anyone looked
 
 ## Campaign Governor: decision rule
 

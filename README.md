@@ -186,7 +186,8 @@ requirements; unsupported evidence; a media spend past its own
 authorized budget; an unresolved misleading-claim risk; a double
 placement; an ineligible creator; a combined media-spend-plus-tie-up-
 fee past the client's own authorization; a tie-up with no recognized
-sponsorship disclosure; a double order) force **hold** and *cannot* be
+sponsorship disclosure; a double order; or either actuation attempted
+with no screening on file at all) force **hold** and *cannot* be
 approved past; a clean proposal for either actuation still always
 routes to a human.
 
@@ -223,9 +224,9 @@ clojure -M:dev:coverage  # cloverage over src, driven by the same suite
 clojure -M:lint          # clj-kondo (errors fail; CI mirrors this)
 ```
 
-85 tests / 490 assertions, 0 failures.
+89 tests / 510 assertions, 0 failures.
 
-Coverage: 97.55% forms / 98.98% lines, measured by `clojure -M:dev:coverage`
+Coverage: 97.64% forms / 99.03% lines, measured by `clojure -M:dev:coverage`
 with **nothing excluded** — not an estimate, and not a subset chosen to
 flatter the number. Every namespace, including both `-main` drivers, is
 at or above 95%.
@@ -297,7 +298,7 @@ acts on it afterwards.
 | `src/advertising/registry.cljc` | Campaign-placement and creator-tie-up-order draft records, plus `media-spend-exceeds-authorized-budget?` -- the SEVENTH instance of this fleet's MAXIMUM-ceiling check family (`facility`/`school`/`card`/`recovery`/`care`/`navigator` established the first six) -- and `creator-tieup-fee-exceeds-authorized-budget?`, the EIGHTH, and the first in the family to SUM two of the subject's own amounts before comparing |
 | `src/advertising/facts.cljc` | Per-jurisdiction advertising-standards catalog with an official spec-basis citation per entry, PLUS a separately-cited sponsorship-disclosure basis and published-label set per entry, honest coverage reporting for both |
 | `src/advertising/advertisingadvisor.cljc` | **AdOps-LLM** -- `mock-advisor` ‖ `llm-advisor`; intake/media-plan-verification/misleading-claim-risk-screening/campaign-placement proposals, plus creator-eligibility-screening/tie-up-brief/tie-up-order proposals. Never proposes a disclosure label -- it reports the recorded one verbatim, so the governor's published-label check cannot be defeated by a plausible invention |
-| `src/advertising/governor.cljc` | **Campaign Governor** -- 7 HARD checks (spec-basis · evidence-incomplete · media-spend-exceeds-authorized-budget, pure ground-truth ceiling recompute · misleading-claim-risk-unresolved, unconditional evaluation, the THIRTY-EIGHTH grounding of this discipline · creator-ineligible, unconditional · tieup-evidence-incomplete · sponsorship-disclosure-missing, pure ground-truth recompute against the jurisdiction's own published labels, a genuinely new concept in this fleet) + already-placed and already-ordered guards + 1 soft (confidence/actuation gate) |
+| `src/advertising/governor.cljc` | **Campaign Governor** -- 9 HARD checks (spec-basis · evidence-incomplete · media-spend-exceeds-authorized-budget, pure ground-truth ceiling recompute · misleading-claim-risk-unresolved, unconditional evaluation, the THIRTY-EIGHTH grounding of this discipline · risk-screen-missing · creator-ineligible, unconditional · tieup-evidence-incomplete · sponsorship-disclosure-missing, pure ground-truth recompute against the jurisdiction's own published labels, a genuinely new concept in this fleet · creator-screen-missing) + already-placed and already-ordered guards + 1 soft (confidence/actuation gate) |
 | `src/advertising/phase.cljc` | **Phase 0→3** -- read-only → assisted intake → assisted verify → supervised (BOTH actuations always human, enforced structurally via `actuation-ops`; campaign intake is the ONLY auto-eligible op, no direct capital risk) |
 | `src/advertising/operation.cljc` | **OperationActor** -- langgraph-clj StateGraph |
 | `src/advertising/sim.cljc` | demo driver |
@@ -321,15 +322,22 @@ ordering -- the core governed lifecycles this blueprint's own
 | Creator-tie-up ordering, HARD-gated on tie-up evidence, the COMBINED media-spend-plus-fee ceiling and a disclosure label the jurisdiction's own authority publishes, plus a double-order guard (`:actuation/order-creator-tieup`) | Negotiating or pricing the tie-up, and any judgment about whether a given creator suits the brand |
 | Immutable audit ledger for every intake/verification/screening/placement/tie-up-order decision | |
 
-A known R0 boundary, stated plainly: ordering a tie-up requires the
-tie-up evidence checklist on file, but the checklist is
-operator-submitted, so it attests that a creator-eligibility record
-*exists* rather than proving `:creator/screen` actually ran clean.
-That is the same shape the placement lifecycle already ships
-(`:media-plan/verify` vs `:risk/screen`), and it is left consistent
-rather than tightened on one side only -- an `:actuation/order-
-creator-tieup` that HARD-requires a committed `:eligible` screening
-verdict is the natural next gate.
+**"We never looked" is not a clean state.** Both actuations HARD-require
+a committed screening verdict that actually clears -- `:resolved` for
+misleading-claim risk, `:eligible` for the creator. Until ADR-0003
+those checks only fired when a screening record existed AND reported a
+problem, so skipping the screening step entirely was the way through;
+four tests in this repo encoded that hole without anyone noticing. A
+campaign nobody screened carries the same exposure as one screened
+badly, plus no record that anyone looked — strictly worse to defend if
+the placement is later disputed.
+
+A known R0 boundary that remains: the evidence checklists behind
+`:media-plan/verify` and `:tieup/verify` are still operator-submitted,
+so an operator can assert documents that do not exist. ADR-0003 makes
+the screening *verdicts* first-class governor inputs; it does not make
+the checklists self-proving. That needs per-document attestation
+records.
 
 Extending coverage is additive: add the next gate (e.g. a creative-
 rights-clearance check, or the screening-verdict requirement above) as
@@ -374,7 +382,8 @@ history and design, and
 the creator-tie-up (YouTube / influencer) lifecycle -- why it became a
 second actuation on this actor rather than a new repository, and why
 sponsorship disclosure is a governor check rather than an advisor
-responsibility.
+responsibility. [`docs/adr/0003-screening-must-be-on-file.md`](docs/adr/0003-screening-must-be-on-file.md)
+closes the boundary ADR-0002 left open, on both lifecycles at once.
 
 ## License
 

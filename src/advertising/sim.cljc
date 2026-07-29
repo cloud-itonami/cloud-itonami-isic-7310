@@ -70,6 +70,13 @@
     (println (exec! actor "t6" {:op :media-plan/verify :subject "campaign-3"} operator))
     (println (approve! actor "t6"))
 
+    (println "== actuation/place-campaign campaign-3 BEFORE any risk screening (-> HARD hold, ADR-0003) ==")
+    (println (exec! actor "t6b" {:op :actuation/place-campaign :subject "campaign-3"} operator))
+
+    (println "== risk/screen campaign-3 (clean; escalates -- human approves) ==")
+    (println (exec! actor "t6c" {:op :risk/screen :subject "campaign-3"} operator))
+    (println (approve! actor "t6c"))
+
     (println "== actuation/place-campaign campaign-3 (spend 900000 > authorized 800000 -> HARD hold) ==")
     (println (exec! actor "t7" {:op :actuation/place-campaign :subject "campaign-3"} operator))
 
@@ -99,22 +106,33 @@
     (println (exec! actor "u4" {:op :tieup/verify :subject "campaign-6"} operator))
     (println (approve! actor "u4"))
 
+    (println "== actuation/order-creator-tieup campaign-6 BEFORE any creator screening (-> HARD hold, ADR-0003) ==")
+    (println (exec! actor "u4b" {:op :actuation/order-creator-tieup :subject "campaign-6"} operator))
+
+    (println "== creator/screen campaign-6 (clean; escalates -- human approves) ==")
+    (println (exec! actor "u4c" {:op :creator/screen :subject "campaign-6"} operator))
+    (println (approve! actor "u4c"))
+
     (println "== actuation/order-creator-tieup campaign-6 (media 500000 + fee 400000 > authorized 800000 -> HARD hold) ==")
     (println (exec! actor "u5" {:op :actuation/order-creator-tieup :subject "campaign-6"} operator))
 
     (println "== creator/screen campaign-7 (ineligible creator -> HARD hold, never reaches a human) ==")
     (println (exec! actor "u6" {:op :creator/screen :subject "campaign-7"} operator))
 
-    (println "== tieup/verify campaign-8 (escalates -- human approves; sets up the no-disclosure test) ==")
+    (println "== tieup/verify + creator/screen campaign-8 (escalates -- human approves; sets up the no-disclosure test) ==")
     (println (exec! actor "u7" {:op :tieup/verify :subject "campaign-8"} operator))
     (println (approve! actor "u7"))
+    (println (exec! actor "u7b" {:op :creator/screen :subject "campaign-8"} operator))
+    (println (approve! actor "u7b"))
 
     (println "== actuation/order-creator-tieup campaign-8 (開示表示なし -> HARD hold) ==")
     (println (exec! actor "u8" {:op :actuation/order-creator-tieup :subject "campaign-8"} operator))
 
-    (println "== tieup/verify campaign-9 (escalates -- human approves; sets up the unrecognized-label test) ==")
+    (println "== tieup/verify + creator/screen campaign-9 (escalates -- human approves; sets up the unrecognized-label test) ==")
     (println (exec! actor "u9" {:op :tieup/verify :subject "campaign-9"} operator))
     (println (approve! actor "u9"))
+    (println (exec! actor "u9b" {:op :creator/screen :subject "campaign-9"} operator))
+    (println (approve! actor "u9b"))
 
     (println "== actuation/order-creator-tieup campaign-9 (開示表示「タイアップ」は当局の公表例に無い -> HARD hold) ==")
     (println (exec! actor "u10" {:op :actuation/order-creator-tieup :subject "campaign-9"} operator))

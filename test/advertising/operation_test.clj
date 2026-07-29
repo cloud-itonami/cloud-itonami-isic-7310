@@ -38,13 +38,24 @@
 (defn- resume! [actor tid status]
   (g/run* actor {:approval {:status status :by "op-1"}} {:thread-id tid :resume? true}))
 
-(defn- verify! [actor tid-prefix subject]
+(defn- verify!
+  "Everything `:actuation/place-campaign` requires before it can even
+  reach a human: a committed media-plan assessment AND a committed
+  resolved risk screening (ADR-0003)."
+  [actor tid-prefix subject]
   (exec-op actor (str tid-prefix "-v") {:op :media-plan/verify :subject subject} operator)
-  (resume! actor (str tid-prefix "-v") :approved))
+  (resume! actor (str tid-prefix "-v") :approved)
+  (exec-op actor (str tid-prefix "-s") {:op :risk/screen :subject subject} operator)
+  (resume! actor (str tid-prefix "-s") :approved))
 
-(defn- brief! [actor tid-prefix subject]
+(defn- brief!
+  "The tie-up equivalent: a committed evidence brief AND a committed
+  eligible creator screening."
+  [actor tid-prefix subject]
   (exec-op actor (str tid-prefix "-b") {:op :tieup/verify :subject subject} operator)
-  (resume! actor (str tid-prefix "-b") :approved))
+  (resume! actor (str tid-prefix "-b") :approved)
+  (exec-op actor (str tid-prefix "-cs") {:op :creator/screen :subject subject} operator)
+  (resume! actor (str tid-prefix "-cs") :approved))
 
 ;; ----------------------------- the human veto -----------------------------
 

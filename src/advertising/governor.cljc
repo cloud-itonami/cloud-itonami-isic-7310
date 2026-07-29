@@ -10,7 +10,7 @@
   proposal and fall back to HOLD -- the advertising analog of `cloud-
   itonami-isic-6512`'s CasualtyGovernor.
 
-  Seven checks, in priority order, ALL HARD violations: a human
+  Nine checks, in priority order, ALL HARD violations: a human
   approver CANNOT override them (you don't get to approve your way
   past a fabricated jurisdiction spec-basis, incomplete evidence, a
   media spend exceeding its own authorized budget, an unresolved
@@ -91,7 +91,20 @@
                                        the actuation op against an
                                        unscreened campaign -- see this
                                        ns's own test suite.
-    5. Creator ineligible          -- reported by THIS proposal itself
+    5. Risk screening missing      -- for `:actuation/place-campaign`,
+                                       a misleading-claim-risk screening
+                                       must actually be ON FILE with a
+                                       resolved verdict. Check 4 only
+                                       fires when a record EXISTS and
+                                       says `:unresolved`, so until this
+                                       check was added (ADR-0003) a
+                                       campaign that was never screened
+                                       placed cleanly. 'We never looked'
+                                       is not a safer state than 'we
+                                       looked and found something' -- it
+                                       is the same exposure with no
+                                       record of it.
+    6. Creator ineligible          -- reported by THIS proposal itself
                                        (a `:creator/screen` that just
                                        found a disqualifying issue with
                                        the YouTube channel / influencer
@@ -105,7 +118,7 @@
                                        discipline as check 4 above, so
                                        the screening op itself can HARD-
                                        hold on its own finding.
-    6. Creator tie-up evidence
+    7. Creator tie-up evidence
        incomplete                     -- for `:actuation/order-creator-
                                        tieup`, has the tie-up actually
                                        been assessed with a full
@@ -118,7 +131,7 @@
                                        tie-up analog of check 2, against
                                        its OWN separately-cited evidence
                                        set.
-    7. Sponsorship disclosure
+    8. Sponsorship disclosure
        missing                        -- for `:actuation/order-creator-
                                        tieup`, INDEPENDENTLY recompute
                                        whether the campaign has recorded
@@ -142,7 +155,14 @@
                                        unlawful stealth-marketing post,
                                        and the one an LLM has no way to
                                        verify for itself.
-    8. Confidence floor / actuation
+    9. Creator screening missing   -- the tie-up half of check 5: for
+                                       `:actuation/order-creator-tieup`,
+                                       an eligible creator screening
+                                       must be ON FILE. Closed at the
+                                       same time as check 5 so the two
+                                       lifecycles stay consistent, which
+                                       is what ADR-0002 asked for.
+   10. Confidence floor / actuation
        gate                          -- LLM confidence below threshold,
                                        OR the op is `:actuation/place-
                                        campaign` or `:actuation/order-
@@ -247,6 +267,42 @@
     (when (or hit-in-proposal? hit-on-file?)
       [{:rule :misleading-claim-risk-unresolved
         :detail "未解決の誤認表示リスクがあるキャンペーンの出稿提案は進められない"}])))
+
+(defn- risk-screen-missing-violations
+  "For `:actuation/place-campaign`, a misleading-claim-risk screening
+  must actually be ON FILE with a resolved verdict.
+
+  Closes the R0 boundary ADR-0002 recorded: until this check existed,
+  `misleading-claim-risk-unresolved-violations` only fired when a
+  screening record existed AND said `:unresolved`, so a campaign that
+  was NEVER screened placed cleanly. 'We never looked' is not a safer
+  state than 'we looked and found something' -- it is the same
+  exposure with no record of it, which is worse.
+
+  `:unresolved` is deliberately excluded from the trigger set: the
+  more specific rule above already reports it, and two basis entries
+  for one underlying fact makes the ledger harder to read."
+  [{:keys [op subject]} st]
+  (when (= op :actuation/place-campaign)
+    (let [verdict (:verdict (store/risk-screen-of st subject))]
+      (when-not (contains? #{:resolved :unresolved} verdict)
+        [{:rule :risk-screen-missing
+          :detail (str subject " に誤認表示リスクスクリーニングの完了記録が無い"
+                      (when verdict (str " (verdict=" verdict ")")))}]))))
+
+(defn- creator-screen-missing-violations
+  "For `:actuation/order-creator-tieup`, a creator-eligibility
+  screening must actually be ON FILE with an eligible verdict -- the
+  tie-up half of the same R0 boundary, closed at the same time so the
+  two lifecycles stay consistent (ADR-0002 called for exactly that:
+  'would be worth applying to both lifecycles at once')."
+  [{:keys [op subject]} st]
+  (when (= op :actuation/order-creator-tieup)
+    (let [verdict (:verdict (store/creator-screen-of st subject))]
+      (when-not (contains? #{:eligible :ineligible} verdict)
+        [{:rule :creator-screen-missing
+          :detail (str subject " にクリエイター適格性スクリーニングの適格判定記録が無い"
+                      (when verdict (str " (verdict=" verdict ")")))}]))))
 
 (defn- already-placed-violations
   "For `:actuation/place-campaign`, refuses to place the SAME campaign
@@ -360,8 +416,10 @@
                            (evidence-incomplete-violations request st)
                            (media-spend-exceeds-authorized-budget-violations request st)
                            (misleading-claim-risk-unresolved-violations request proposal st)
+                           (risk-screen-missing-violations request st)
                            (already-placed-violations request st)
                            (creator-ineligible-violations request proposal st)
+                           (creator-screen-missing-violations request st)
                            (tieup-evidence-incomplete-violations request st)
                            (tieup-fee-exceeds-authorized-budget-violations request st)
                            (sponsorship-disclosure-missing-violations request st)

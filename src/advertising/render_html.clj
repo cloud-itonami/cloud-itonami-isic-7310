@@ -65,6 +65,15 @@
     (exec! actor "t6" {:op :media-plan/verify :subject "campaign-3"})
     (approve! actor "t6")
 
+    ;; campaign-3: fully evidenced but never screened -> HARD hold,
+    ;; :risk-screen-missing (ADR-0003). "We never looked" is not a clean state.
+    (exec! actor "t6b" {:op :actuation/place-campaign :subject "campaign-3"})
+
+    ;; campaign-3: screening runs clean, approved -- so the hold below is the
+    ;; budget ceiling and nothing else.
+    (exec! actor "t6c" {:op :risk/screen :subject "campaign-3"})
+    (approve! actor "t6c")
+
     ;; campaign-3: proposed media spend 900000 > authorized budget 800000 ->
     ;; HARD hold, :media-spend-exceeds-authorized-budget -- never reaches a human.
     (exec! actor "t7" {:op :actuation/place-campaign :subject "campaign-3"})
@@ -91,26 +100,37 @@
     (exec! actor "u3" {:op :actuation/order-creator-tieup :subject "campaign-5"})
     (approve! actor "u3")
 
-    ;; campaign-6: brief approved, then media 500000 + fee 400000 > authorized
-    ;; 800000 -> HARD hold, :creator-tieup-fee-exceeds-authorized-budget.
+    ;; campaign-6: briefed but the creator was never screened -> HARD hold,
+    ;; :creator-screen-missing (ADR-0003, the tie-up half).
     (exec! actor "u4" {:op :tieup/verify :subject "campaign-6"})
     (approve! actor "u4")
+    (exec! actor "u4b" {:op :actuation/order-creator-tieup :subject "campaign-6"})
+
+    ;; campaign-6: creator screens clean, approved -- so the hold below is the
+    ;; combined-spend ceiling and nothing else: media 500000 + fee 400000 >
+    ;; authorized 800000 -> :creator-tieup-fee-exceeds-authorized-budget.
+    (exec! actor "u4c" {:op :creator/screen :subject "campaign-6"})
+    (approve! actor "u4c")
     (exec! actor "u5" {:op :actuation/order-creator-tieup :subject "campaign-6"})
 
     ;; campaign-7 (creator-eligibility-issue? true): HARD hold,
     ;; :creator-ineligible -- never reaches a human.
     (exec! actor "u6" {:op :creator/screen :subject "campaign-7"})
 
-    ;; campaign-8: no disclosure label recorded at all -> HARD hold,
-    ;; :sponsorship-disclosure-missing.
+    ;; campaign-8: fully briefed and screened, but no disclosure label recorded
+    ;; at all -> HARD hold, :sponsorship-disclosure-missing.
     (exec! actor "u7" {:op :tieup/verify :subject "campaign-8"})
     (approve! actor "u7")
+    (exec! actor "u7b" {:op :creator/screen :subject "campaign-8"})
+    (approve! actor "u7b")
     (exec! actor "u8" {:op :actuation/order-creator-tieup :subject "campaign-8"})
 
     ;; campaign-9: 「タイアップ」 IS recorded, but is not among the 消費者庁's
     ;; own published examples -> the SAME HARD hold, different cause.
     (exec! actor "u9" {:op :tieup/verify :subject "campaign-9"})
     (approve! actor "u9")
+    (exec! actor "u9b" {:op :creator/screen :subject "campaign-9"})
+    (approve! actor "u9b")
     (exec! actor "u10" {:op :actuation/order-creator-tieup :subject "campaign-9"})
 
     ;; campaign-5 AGAIN: already ordered in u3 -> HARD hold, :already-ordered.

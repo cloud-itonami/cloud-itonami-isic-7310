@@ -30,7 +30,9 @@
     :creator-tieup-fee-exceeds-authorized-budget
     :creator-ineligible
     :sponsorship-disclosure-missing
-    :already-ordered})
+    :already-ordered
+    :risk-screen-missing
+    :creator-screen-missing})
 
 (deftest the-demo-scenario-exercises-every-hard-hold-it-claims-to
   (let [db (render/run-demo!)
