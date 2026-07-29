@@ -1,5 +1,5 @@
 (ns advertising.facts-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [clojure.test :refer [deftest is testing]]
             [advertising.facts :as facts]))
 
 (deftest jpn-has-a-spec-basis
@@ -20,3 +20,56 @@
     (is (facts/required-evidence-satisfied? "JPN" all))
     (is (not (facts/required-evidence-satisfied? "JPN" (rest all))))
     (is (not (facts/required-evidence-satisfied? "ATL" all)) "no spec-basis -> never satisfied")))
+
+;; ---------------- sponsorship disclosure (creator tie-up), ADR-0002 ----------------
+
+(deftest every-seeded-jurisdiction-cites-a-disclosure-basis-separately
+  (testing "sponsorship disclosure is its own legal instrument in every jurisdiction seeded here -- an operator disputing a tie-up order needs THAT citation, not the general advertising-standards one"
+    (doseq [iso3 (keys facts/catalog)]
+      (let [d (facts/disclosure-basis iso3)]
+        (is (some? d) (str iso3 " must cite a disclosure basis"))
+        (is (string? (:legal-basis d)))
+        (is (string? (:provenance d)))
+        (is (seq (:accepted-disclosure-labels d)))
+        (is (not= (:legal-basis d) (:legal-basis (facts/spec-basis iso3)))
+            (str iso3 "'s disclosure basis must be a DISTINCT citation"))))))
+
+(deftest unknown-jurisdiction-has-no-fabricated-disclosure-basis
+  (is (nil? (facts/disclosure-basis "ATL")))
+  (is (= [] (facts/accepted-disclosure-labels "ATL")))
+  (is (= [] (facts/tieup-evidence-checklist "ATL"))))
+
+(deftest disclosure-acceptable-only-for-published-labels
+  (testing "a label the authority itself publishes"
+    (is (facts/disclosure-acceptable? "JPN" "PR"))
+    (is (facts/disclosure-acceptable? "JPN" "広告"))
+    (is (facts/disclosure-acceptable? "USA" "#ad"))
+    (is (facts/disclosure-acceptable? "DEU" "Werbung")))
+  (testing "a plausible industry word the authority does NOT publish is not acceptable"
+    (is (not (facts/disclosure-acceptable? "JPN" "タイアップ")))
+    (is (not (facts/disclosure-acceptable? "JPN" "提供"))))
+  (testing "nothing recorded is never acceptable, and neither is a jurisdiction with no cited basis"
+    (is (not (facts/disclosure-acceptable? "JPN" nil)))
+    (is (not (facts/disclosure-acceptable? "JPN" "")))
+    (is (not (facts/disclosure-acceptable? "JPN" "   ")))
+    (is (not (facts/disclosure-acceptable? "ATL" "PR"))))
+  (testing "labels do not leak across jurisdictions"
+    (is (not (facts/disclosure-acceptable? "DEU" "PR")))
+    (is (not (facts/disclosure-acceptable? "JPN" "Werbung")))))
+
+(deftest tieup-evidence-satisfied-needs-every-item
+  (let [all (facts/tieup-evidence-checklist "JPN")]
+    (is (= 4 (count all)))
+    (is (facts/tieup-evidence-satisfied? "JPN" all))
+    (is (not (facts/tieup-evidence-satisfied? "JPN" (rest all))))
+    (is (not (facts/tieup-evidence-satisfied? "ATL" all)) "no spec-basis -> never satisfied"))
+  (testing "the tie-up checklist is its own set, not the placement one"
+    (is (not= (set (facts/tieup-evidence-checklist "JPN"))
+              (set (facts/evidence-checklist "JPN"))))
+    (is (not (facts/tieup-evidence-satisfied? "JPN" (facts/evidence-checklist "JPN")))
+        "satisfying the placement checklist must not satisfy the tie-up one")))
+
+(deftest coverage-reports-disclosure-coverage-honestly
+  (let [report (facts/coverage ["JPN" "ATL"])]
+    (is (= 1 (:disclosure-covered report)))
+    (is (= ["ATL"] (:missing-jurisdictions report)))))

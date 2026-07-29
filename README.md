@@ -4,10 +4,13 @@ Open Business Blueprint for **ISIC Rev.5 7310**: Advertising.
 
 This repository publishes an advertising actor -- campaign intake,
 advertising-standards evidence assessment, misleading-claim-risk
-screening and campaign placement -- as an OSS business that any
-qualified, licensed advertising operator can fork, deploy, run,
-improve and sell, so a community or independent professional never
-surrenders customer data and ledgers to a closed SaaS.
+screening, campaign placement, plus **creator tie-up** (commissioning
+a paid post from a named YouTube channel or influencer) with
+creator-eligibility screening and sponsorship-disclosure gating -- as
+an OSS business that any qualified, licensed advertising operator can
+fork, deploy, run, improve and sell, so a community or independent
+professional never surrenders customer data and ledgers to a closed
+SaaS.
 
 Built on this workspace's
 [`langgraph-clj`](https://github.com/com-junkawasaki/langgraph-clj)
@@ -68,89 +71,174 @@ here it is **AdOps-LLM ⊣ Campaign Governor**.
 > campaign's own proposed media spend actually stays within its own
 > recorded authorized budget -- but it has **no notion of which
 > jurisdiction's advertising-standards law is official, no license to
-> place a real campaign on a client's behalf, and no way to know on
-> its own whether a misleading-claim risk against a campaign has
-> actually stayed unresolved**. Letting it place a campaign directly
+> place a real campaign or commission a real creator on a client's
+> behalf, and no way to know on its own whether a misleading-claim
+> risk against a campaign has actually stayed unresolved, or which
+> sponsorship-disclosure wordings a regulator has actually
+> published**. Letting it place a campaign or order a tie-up directly
 > invites fabricated regulatory citations, a media spend blowing past
-> its own authorized budget, and a misleading claim being quietly
-> published -- and liability, and consumer-protection risk, for
-> whoever runs it. This project seals the AdOps-LLM into a single node
-> and wraps it with an independent **Campaign Governor**, a human
-> **approval workflow**, and an immutable **audit ledger**.
+> its own authorized budget, a misleading claim being quietly
+> published, and a paid influencer post going out with a
+> plausible-but-unrecognized disclosure label (or none) -- and
+> liability, and consumer-protection risk, for whoever runs it. This
+> project seals the AdOps-LLM into a single node and wraps it with an
+> independent **Campaign Governor**, a human **approval workflow**,
+> and an immutable **audit ledger**.
 
 ## Scope: what this actor does and does not do
 
 This actor covers campaign intake through advertising-standards
 evidence assessment, misleading-claim-risk screening and campaign
-placement. It does **not**, by itself, hold any professional license
-required to operate as an advertising agency in a given jurisdiction,
-and it does not claim to. It also does **not** create the creative
-work itself, or judge the artistic/strategic merit of a campaign --
-`advertising.registry/media-spend-exceeds-authorized-budget?` is a
-pure ceiling recompute against the campaign's own recorded fields, not
-a creative or strategic assessment. Whoever deploys and operates a
-live instance (a licensed advertising agency) supplies any
-jurisdiction-specific license, the real creative work and the real
-media-network integrations, and bears that jurisdiction's liability --
-the software supplies the governed, spec-cited, audited execution
-scaffold so that agency does not have to build the compliance layer
-from scratch.
+placement, plus the creator-tie-up lifecycle -- creator-eligibility
+screening, per-jurisdiction tie-up evidence assessment and the tie-up
+order itself. It does **not**, by itself, hold any professional
+license required to operate as an advertising agency in a given
+jurisdiction, and it does not claim to. It also does **not** create
+the creative work itself, or judge the artistic/strategic merit of a
+campaign -- `advertising.registry/media-spend-exceeds-authorized-
+budget?` and `advertising.registry/creator-tieup-fee-exceeds-
+authorized-budget?` are pure ceiling recomputes against the campaign's
+own recorded fields, not creative or strategic assessments.
+
+For creator tie-ups specifically, it does **not** talk to YouTube,
+Instagram, TikTok or X: there is no API call, no order sent to a
+creator, no post published. `advertising.registry/register-creator-
+tieup-order` builds the ORDER RECORD an agency keeps; a human operator
+places the actual order. It also does **not** verify that a creator
+handle exists, that follower counts are genuine, or that a published
+post actually carried its disclosure -- those need integrations and
+observation this actor deliberately does not have, and inventing a
+verdict for them would be exactly the fabrication `advertising.facts`
+refuses to do for jurisdictions.
+
+Whoever deploys and operates a live instance (a licensed advertising
+agency) supplies any jurisdiction-specific license, the real creative
+work, the real media-network integrations and the real creator
+relationships, and bears that jurisdiction's liability -- the software
+supplies the governed, spec-cited, audited execution layer so that
+agency does not have to build the compliance machinery from scratch.
 
 ### Actuation
 
-**Placing a real campaign on the client's behalf is never autonomous,
-at any phase, by construction.** Two independent layers enforce this
-(`advertising.governor`'s `:actuation/place-campaign` high-stakes gate
-and `advertising.phase`'s phase table, which never puts `:actuation/
-place-campaign` in any phase's `:auto` set) -- see `advertising.
-phase`'s docstring and `test/advertising/phase_test.clj`'s
-`place-campaign-never-auto-at-any-phase`. The actor may draft, check
+**Neither real-world act is ever autonomous, at any phase, by
+construction.** This actor performs TWO actuation events:
+
+| Actuation | What it commits the client to |
+|---|---|
+| `:actuation/place-campaign` | placing/publishing a campaign on the client's behalf |
+| `:actuation/order-creator-tieup` | commissioning a paid post from a named YouTube channel / influencer on the client's behalf |
+
+Two independent layers enforce human sign-off for both
+(`advertising.governor`'s `high-stakes` set, and `advertising.phase`'s
+phase table, which subtracts `advertising.phase/actuation-ops` from
+every phase's `:auto` set *structurally* rather than by convention) --
+see `advertising.phase`'s docstring and
+`test/advertising/phase_test.clj`'s
+`place-campaign-never-auto-at-any-phase`,
+`order-creator-tieup-never-auto-at-any-phase` and
+`no-actuation-op-is-ever-auto-eligible`. The actor may draft, check
 and recommend; a human agency operator is always the one who actually
-places a campaign. Unlike most recent siblings, this actor has ONE
-actuation event -- matching `leasing`'s/`underwriting`'s/`testlab`'s/
-`clinic`'s/`veterinary`'s/`funeral`'s/`parksafety`'s/`salon`'s/
-`entertainment`'s/`facility`'s/`consulting`'s single-actuation shape,
-grounded directly in this blueprint's own README text ("No automated
-proposal, by itself, can complete the following without governor
-approval and audit evidence: placing/publishing a campaign on the
-client's behalf") -- a POSITIVE actuation (placing/publishing a real
-record), matching this fleet's majority actuation shape (`3600`/
-`6190` are the fleet's two NEGATIVE-actuation exceptions).
+places a campaign or orders a tie-up. Both are POSITIVE actuations
+(committing a real record), matching this fleet's majority actuation
+shape (`3600`/`6190` are the fleet's two NEGATIVE-actuation
+exceptions).
+
+The two actuations are kept fully independent -- separate guard
+booleans (`:campaign-placed?` / `:tieup-ordered?`), separate
+jurisdiction-scoped sequences (`JPN-PLC-000000` / `JPN-TIE-000000`)
+and separate histories. A campaign that has been placed has **not**
+thereby been ordered from a creator, and holding one must never mask
+the other (see ADR-0002 and
+`the-two-actuation-guards-are-independent`).
 
 ## The core contract
 
 ```
-campaign intake + jurisdiction facts (advertising.facts, spec-cited)
+campaign intake + jurisdiction facts (advertising.facts, spec-cited:
+advertising standards AND sponsorship disclosure, cited separately)
         |
         v
-   ┌──────────────┐   proposal      ┌───────────────────────┐
+   ┌──────────────┐   proposal      ┌───────────────────────────────┐
    │ AdOps-LLM    │ ─────────────▶ │ Campaign Governor:            │  (independent system)
-   │ (sealed)     │  + citations    │ spec-basis · evidence-       │
-   └──────────────┘                 │ incomplete · media-spend-    │
-          │                 commit ◀┼ exceeds-authorized-budget    │
+   │ (sealed)     │  + citations    │ spec-basis · evidence-        │
+   └──────────────┘                 │ incomplete · media-spend-     │
+          │                 commit ◀┼ exceeds-authorized-budget     │
           │                         │ (ceiling) · misleading-claim- │
-    record + ledger        escalate ┼ risk-unresolved               │
-          │              (ALWAYS for│ (unconditional) ·             │
-          │               :actuation│ already-placed                │
-          │               /place-   └───────────────────────┘
-          ▼               campaign)
-      human approval
+    record + ledger                 │ risk-unresolved               │
+          │                         │ (unconditional) ·             │
+          │                         │ already-placed                │
+          │                         │ ── creator tie-up ──          │
+          │                         │ creator-ineligible            │
+          │              escalate   │ (unconditional) · tieup-      │
+          │            (ALWAYS for  │ evidence-incomplete ·         │
+          │             BOTH        │ creator-tieup-fee-exceeds-    │
+          │             actuations) │ authorized-budget (combined   │
+          │                        ◀┼ ceiling) · sponsorship-       │
+          ▼                         │ disclosure-missing ·          │
+      human approval                │ already-ordered               │
+                                    └───────────────────────────────┘
 ```
 
-**The AdOps-LLM never places a campaign the Campaign Governor would
-reject, and never does so without a human sign-off.** Hard violations
-(fabricated regulatory requirements; unsupported evidence; a media
-spend past its own authorized budget; an unresolved misleading-claim
-risk; a double placement) force **hold** and *cannot* be approved
-past; a clean placement proposal still always routes to a human.
+**The AdOps-LLM never places a campaign, or orders a creator tie-up,
+that the Campaign Governor would reject -- and never does either
+without a human sign-off.** Hard violations (fabricated regulatory
+requirements; unsupported evidence; a media spend past its own
+authorized budget; an unresolved misleading-claim risk; a double
+placement; an ineligible creator; a combined media-spend-plus-tie-up-
+fee past the client's own authorization; a tie-up with no recognized
+sponsorship disclosure; a double order) force **hold** and *cannot* be
+approved past; a clean proposal for either actuation still always
+routes to a human.
+
+### The sponsorship-disclosure gate
+
+The one check an LLM structurally cannot stand in for. A creator tie-up
+is lawful or unlawful largely on one question -- *was the post
+identifiable as advertising?* -- and the answer is jurisdiction-
+specific published fact, not reasoning:
+
+| Jurisdiction | Cited disclosure basis |
+|---|---|
+| JPN | 景表法5条3号 指定告示「一般消費者が事業者の表示であることを判別することが困難である表示」(令和5年内閣府告示第19号、ステマ規制) |
+| USA | FTC Endorsement Guides, 16 CFR Part 255 |
+| GBR | CAP Code section 2 (Recognition of marketing communications) |
+| DEU | UWG § 5a Abs. 4 |
+
+`advertising.governor` independently recomputes, against the
+campaign's own recorded `:disclosure-label`, whether that label is one
+the jurisdiction's **own authority publishes**. Nothing recorded and
+*something recorded that the authority does not publish* are the SAME
+HARD hold -- 「タイアップ」 is a real word the industry uses that is not
+among the 消費者庁's published examples (「広告」「宣伝」「プロモーション」
+「PR」), and a governor that accepted it because it *sounds* like a
+disclosure would be worse than useless. See
+`tieup-with-unpublished-disclosure-label-is-held`.
 
 ## Run
 
 ```bash
-clojure -M:dev:run     # walk one clean single-actuation lifecycle + four HARD-hold cases through the actor
-clojure -M:dev:test    # governor contract · phase invariants · store parity · registry conformance · facts coverage
-clojure -M:lint        # clj-kondo (errors fail; CI mirrors this)
+clojure -M:dev:run       # walk both clean actuation lifecycles + eight HARD-hold cases through the actor
+clojure -M:dev:test      # governor contract · phase invariants · store parity · registry conformance · facts coverage · advisor boundary
+clojure -M:dev:coverage  # cloverage over src, driven by the same suite
+clojure -M:lint          # clj-kondo (errors fail; CI mirrors this)
 ```
+
+85 tests / 490 assertions, 0 failures.
+
+Coverage: 97.55% forms / 98.98% lines, measured by `clojure -M:dev:coverage`
+with **nothing excluded** — not an estimate, and not a subset chosen to
+flatter the number. Every namespace, including both `-main` drivers, is
+at or above 95%.
+
+Three of the seven suites exist specifically to cover paths the main
+governor-contract suite drives straight past — each was written after
+measuring, because the measurement is what revealed they were missing:
+
+| Suite | The guarantee it holds down |
+|---|---|
+| `advertisingadvisor_test.clj` | A real LLM's response is untrusted input. Every malformed shape — prose, broken EDN, right-EDN-wrong-type, missing keys, a non-numeric confidence — must degrade to a low-confidence `:noop` with no `:stake`, never to a usable proposal. This path runs on every request in production and the mock advisor never touches it. |
+| `operation_test.clj` | The approver's **rejection** is a real veto: it writes no record, does not flip a guard boolean, and does not burn the actuation (the same campaign stays placeable once the objection is resolved). And the rollout phases gate *in fact*, not just in the phase table. |
+| `drivers_test.clj` | The demo and the operator console narrate the governor's behaviour in prose. These tests tie that narration to what the governor actually does, so a rule change cannot quietly turn the demo into a lie — and they assert the console is byte-identical across reruns, which is what `regenerate.yml` depends on. |
 
 ## Robotics premise
 
@@ -188,16 +276,29 @@ than a shared cross-operator data contract, so `advertising.*` runs on
 the generic robotics/identity/forms/dmn/bpmn/audit-ledger stack only
 -- no bespoke domain capability lib to reference at all.
 
+This holds for the creator-tie-up lifecycle too, deliberately. The
+workspace does ship platform adapters an operator could wire in
+downstream of a human-approved tie-up order --
+[`kotoba-lang/com-youtube`](https://github.com/kotoba-lang/com-youtube)
+(YouTube Data API v3),
+[`kotoba-lang/com-googleads`](https://github.com/kotoba-lang/com-googleads),
+[`kotoba-lang/adnet`](https://github.com/kotoba-lang/adnet) -- and this
+repo depends on **none** of them. Taking such a dependency would put a
+real network call behind the governor's actuation gate, which is
+precisely the boundary `Actuation` above draws: this actor produces
+the audited order record, and the operator's own integration, if any,
+acts on it afterwards.
+
 ## Layout
 
 | File | Role |
 |---|---|
-| `src/advertising/store.cljc` | **Store** protocol -- `MemStore` ‖ `DatomicStore` (`langchain.db`) + append-only audit ledger + campaign-placement history. No dynamically-filed sub-record -- the actuation op acts directly on a pre-seeded campaign, and the double-actuation guard checks a dedicated `:campaign-placed?` boolean rather than a `:status` value |
-| `src/advertising/registry.cljc` | Campaign-placement draft records, plus `media-spend-exceeds-authorized-budget?` -- the SEVENTH instance of this fleet's MAXIMUM-ceiling check family (`facility`/`school`/`card`/`recovery`/`care`/`navigator` established the first six) |
-| `src/advertising/facts.cljc` | Per-jurisdiction advertising-standards catalog with an official spec-basis citation per entry, honest coverage reporting |
-| `src/advertising/advertisingadvisor.cljc` | **AdOps-LLM** -- `mock-advisor` ‖ `llm-advisor`; intake/media-plan-verification/misleading-claim-risk-screening/campaign-placement proposals |
-| `src/advertising/governor.cljc` | **Campaign Governor** -- 3 HARD checks (spec-basis · evidence-incomplete · media-spend-exceeds-authorized-budget, pure ground-truth ceiling recompute · misleading-claim-risk-unresolved, unconditional evaluation, the THIRTY-EIGHTH grounding of this discipline, a genuinely new concept grounded in this blueprint's own Trust Control text) + already-placed guard + 1 soft (confidence/actuation gate) |
-| `src/advertising/phase.cljc` | **Phase 0→3** -- read-only → assisted intake → assisted verify → supervised (campaign placement always human; campaign intake is the ONLY auto-eligible op, no direct capital risk) |
+| `src/advertising/store.cljc` | **Store** protocol -- `MemStore` ‖ `DatomicStore` (`langchain.db`) + append-only audit ledger + campaign-placement history + creator-tie-up-order history. No dynamically-filed sub-record -- both actuation ops act directly on a pre-seeded campaign, and each double-actuation guard checks its OWN dedicated boolean (`:campaign-placed?` / `:tieup-ordered?`) rather than a `:status` value |
+| `src/advertising/registry.cljc` | Campaign-placement and creator-tie-up-order draft records, plus `media-spend-exceeds-authorized-budget?` -- the SEVENTH instance of this fleet's MAXIMUM-ceiling check family (`facility`/`school`/`card`/`recovery`/`care`/`navigator` established the first six) -- and `creator-tieup-fee-exceeds-authorized-budget?`, the EIGHTH, and the first in the family to SUM two of the subject's own amounts before comparing |
+| `src/advertising/facts.cljc` | Per-jurisdiction advertising-standards catalog with an official spec-basis citation per entry, PLUS a separately-cited sponsorship-disclosure basis and published-label set per entry, honest coverage reporting for both |
+| `src/advertising/advertisingadvisor.cljc` | **AdOps-LLM** -- `mock-advisor` ‖ `llm-advisor`; intake/media-plan-verification/misleading-claim-risk-screening/campaign-placement proposals, plus creator-eligibility-screening/tie-up-brief/tie-up-order proposals. Never proposes a disclosure label -- it reports the recorded one verbatim, so the governor's published-label check cannot be defeated by a plausible invention |
+| `src/advertising/governor.cljc` | **Campaign Governor** -- 7 HARD checks (spec-basis · evidence-incomplete · media-spend-exceeds-authorized-budget, pure ground-truth ceiling recompute · misleading-claim-risk-unresolved, unconditional evaluation, the THIRTY-EIGHTH grounding of this discipline · creator-ineligible, unconditional · tieup-evidence-incomplete · sponsorship-disclosure-missing, pure ground-truth recompute against the jurisdiction's own published labels, a genuinely new concept in this fleet) + already-placed and already-ordered guards + 1 soft (confidence/actuation gate) |
+| `src/advertising/phase.cljc` | **Phase 0→3** -- read-only → assisted intake → assisted verify → supervised (BOTH actuations always human, enforced structurally via `actuation-ops`; campaign intake is the ONLY auto-eligible op, no direct capital risk) |
 | `src/advertising/operation.cljc` | **OperationActor** -- langgraph-clj StateGraph |
 | `src/advertising/sim.cljc` | demo driver |
 | `test/advertising/*_test.clj` | governor contract · phase invariants · store parity · registry conformance · facts coverage |
@@ -206,7 +307,8 @@ the generic robotics/identity/forms/dmn/bpmn/audit-ledger stack only
 
 This actor covers campaign intake through advertising-standards
 evidence assessment, misleading-claim-risk screening and campaign
-placement -- the core governed lifecycle this blueprint's own
+placement, plus creator-eligibility screening through creator-tie-up
+ordering -- the core governed lifecycles this blueprint's own
 `docs/business-model.md` names as its Offer:
 
 | Covered | Not covered (out of scope for this R0) |
@@ -214,32 +316,65 @@ placement -- the core governed lifecycle this blueprint's own
 | Campaign intake + per-jurisdiction advertising-standards checklisting, HARD-gated on an official spec-basis citation (`:campaign/intake`/`:media-plan/verify`) | Real media-network integration, real creative production itself (see `advertising.facts`'s docstring) |
 | Misleading-claim-risk screening, evaluated unconditionally so the screening op itself can HARD-hold on its own finding (`:risk/screen`) | Any creative/strategic judgment itself -- deliberately outside this actor's competence |
 | Campaign placement, HARD-gated on full evidence and the campaign's own authorized-budget ceiling, plus a double-placement guard (`:actuation/place-campaign`) | |
-| Immutable audit ledger for every intake/verification/screening/placement decision | |
+| Creator-eligibility screening for the YouTube channel / influencer a campaign wants to commission, evaluated unconditionally (`:creator/screen`) | Any platform API call -- no YouTube/Instagram/TikTok/X integration, no order actually sent to a creator |
+| Per-jurisdiction creator-tie-up evidence + sponsorship-disclosure checklisting, citing the disclosure framework specifically (`:tieup/verify`) | Verifying a creator handle exists, that follower counts are genuine, or that a published post actually carried its disclosure |
+| Creator-tie-up ordering, HARD-gated on tie-up evidence, the COMBINED media-spend-plus-fee ceiling and a disclosure label the jurisdiction's own authority publishes, plus a double-order guard (`:actuation/order-creator-tieup`) | Negotiating or pricing the tie-up, and any judgment about whether a given creator suits the brand |
+| Immutable audit ledger for every intake/verification/screening/placement/tie-up-order decision | |
+
+A known R0 boundary, stated plainly: ordering a tie-up requires the
+tie-up evidence checklist on file, but the checklist is
+operator-submitted, so it attests that a creator-eligibility record
+*exists* rather than proving `:creator/screen` actually ran clean.
+That is the same shape the placement lifecycle already ships
+(`:media-plan/verify` vs `:risk/screen`), and it is left consistent
+rather than tightened on one side only -- an `:actuation/order-
+creator-tieup` that HARD-requires a committed `:eligible` screening
+verdict is the natural next gate.
 
 Extending coverage is additive: add the next gate (e.g. a creative-
-rights-clearance check) as its own governed op with its own HARD
-checks and tests, following the SAME "an independent governor
-re-verifies against the actor's own records before any real-world act"
-pattern this repo's flagship op already establishes.
+rights-clearance check, or the screening-verdict requirement above) as
+its own governed op with its own HARD checks and tests, following the
+SAME "an independent governor re-verifies against the actor's own
+records before any real-world act" pattern both of this repo's
+actuation ops already establish.
 
 ## Jurisdiction coverage (honest)
 
 `advertising.facts/coverage` reports how many requested jurisdictions
 actually have an official spec-basis in `advertising.facts/catalog`
 -- currently 4 seeded (JPN, USA, GBR, DEU) out of ~194 jurisdictions
-worldwide. This is a starting catalog to prove the governor contract
-end-to-end, not a claim of global coverage. Adding a jurisdiction is
-additive: one map entry in `advertising.facts/catalog`, citing a real
-official source -- never fabricate a jurisdiction's requirements to
-make coverage look bigger.
+worldwide -- and, separately, `:disclosure-covered`: how many of those
+also carry an official sponsorship-disclosure basis for creator
+tie-ups (currently the same 4). The two are reported separately
+because they are separate legal instruments; a jurisdiction could
+plausibly be added with one and not the other, and the governor holds
+on whichever is missing. This is a starting catalog to prove the
+governor contract end-to-end, not a claim of global coverage. Adding a
+jurisdiction is additive: one map entry in
+`advertising.facts/catalog`, citing a real official source for each
+basis -- never fabricate a jurisdiction's requirements, or a
+disclosure label an authority has not published, to make coverage look
+bigger.
+
+`:accepted-disclosure-labels` deserves its own honesty note: it lists
+the wordings each authority itself publishes as examples, and is
+deliberately NOT an exhaustive legal whitelist -- no authority
+publishes one. `disclosure-acceptable?` is therefore a **floor** (did
+the operator record a label the authority has itself named?), not a
+legal opinion that the resulting post is compliant.
 
 ## Maturity
 
 `:implemented` -- `AdOps-LLM` + `Campaign Governor` run as real,
 tested code (see `Run` above), promoted from the originally-published
-`:blueprint`-tier scaffold, modeled closely on the fifty-three prior
+`:blueprint`-tier design, modeled closely on the fifty-three prior
 actors' architecture. See `docs/adr/0001-architecture.md` for the
-history and design.
+history and design, and
+[`docs/adr/0002-creator-tieup.md`](docs/adr/0002-creator-tieup.md) for
+the creator-tie-up (YouTube / influencer) lifecycle -- why it became a
+second actuation on this actor rather than a new repository, and why
+sponsorship disclosure is a governor check rather than an advisor
+responsibility.
 
 ## License
 

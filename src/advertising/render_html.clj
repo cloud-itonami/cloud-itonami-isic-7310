@@ -9,6 +9,7 @@
             [advertising.store :as store]
             [advertising.operation :as op]
             [advertising.phase :as phase]
+            [advertising.facts :as facts]
             [advertising.governor :as governor]
             [langgraph.graph :as g]))
 
@@ -27,11 +28,14 @@
   `advertising.sim` walks, exercised here for HTML capture instead of
   stdout printing. Covers:
     - one op that auto-commits clean at phase 3 (:campaign/intake)
-    - the one always-escalate high-stakes op (:actuation/place-campaign),
-      approved by a human
-    - four DISTINCT HARD-hold reasons that never reach a human:
+    - BOTH always-escalate high-stakes ops (:actuation/place-campaign,
+      :actuation/order-creator-tieup), each approved by a human
+    - eight DISTINCT HARD-hold reasons that never reach a human:
       :no-spec-basis, :media-spend-exceeds-authorized-budget,
-      :misleading-claim-risk-unresolved, :already-placed."
+      :misleading-claim-risk-unresolved, :already-placed,
+      :creator-tieup-fee-exceeds-authorized-budget, :creator-ineligible,
+      :sponsorship-disclosure-missing (twice, from its two distinct
+      causes), :already-ordered."
   []
   (let [db (store/seed-db)
         actor (op/build db)]
@@ -72,6 +76,45 @@
     ;; campaign-1 AGAIN: already placed in t4 -> HARD hold, :already-placed --
     ;; never reaches a human.
     (exec! actor "t9" {:op :actuation/place-campaign :subject "campaign-1"})
+
+    ;; ---- creator tie-up (YouTube / influencer) lifecycle, ADR-0002 ----
+
+    ;; campaign-5 (JPN, @sato-bakery-review on youtube): creator screening and
+    ;; tie-up brief both escalate, both approved.
+    (exec! actor "u1" {:op :creator/screen :subject "campaign-5"})
+    (approve! actor "u1")
+    (exec! actor "u2" {:op :tieup/verify :subject "campaign-5"})
+    (approve! actor "u2")
+
+    ;; campaign-5: tie-up order -- ALWAYS escalates (the second member of
+    ;; advertising.governor/high-stakes), approved.
+    (exec! actor "u3" {:op :actuation/order-creator-tieup :subject "campaign-5"})
+    (approve! actor "u3")
+
+    ;; campaign-6: brief approved, then media 500000 + fee 400000 > authorized
+    ;; 800000 -> HARD hold, :creator-tieup-fee-exceeds-authorized-budget.
+    (exec! actor "u4" {:op :tieup/verify :subject "campaign-6"})
+    (approve! actor "u4")
+    (exec! actor "u5" {:op :actuation/order-creator-tieup :subject "campaign-6"})
+
+    ;; campaign-7 (creator-eligibility-issue? true): HARD hold,
+    ;; :creator-ineligible -- never reaches a human.
+    (exec! actor "u6" {:op :creator/screen :subject "campaign-7"})
+
+    ;; campaign-8: no disclosure label recorded at all -> HARD hold,
+    ;; :sponsorship-disclosure-missing.
+    (exec! actor "u7" {:op :tieup/verify :subject "campaign-8"})
+    (approve! actor "u7")
+    (exec! actor "u8" {:op :actuation/order-creator-tieup :subject "campaign-8"})
+
+    ;; campaign-9: 「タイアップ」 IS recorded, but is not among the 消費者庁's
+    ;; own published examples -> the SAME HARD hold, different cause.
+    (exec! actor "u9" {:op :tieup/verify :subject "campaign-9"})
+    (approve! actor "u9")
+    (exec! actor "u10" {:op :actuation/order-creator-tieup :subject "campaign-9"})
+
+    ;; campaign-5 AGAIN: already ordered in u3 -> HARD hold, :already-ordered.
+    (exec! actor "u11" {:op :actuation/order-creator-tieup :subject "campaign-5"})
 
     db))
 
@@ -129,6 +172,34 @@
              "<td class=\"" cls "\">" (esc label) "</td>"
              "</tr>")))))
 
+(defn- tieup-rows
+  "One row per campaign that actually names a creator -- campaigns with
+  no `:creator-handle` have no tie-up lifecycle to report, and padding
+  the table with them would imply a tie-up was considered and cleared."
+  [db]
+  (for [c (store/all-campaigns db)
+        :when (:creator-handle c)]
+    (let [label (:disclosure-label c)
+          ok-label? (facts/disclosure-acceptable? (:jurisdiction c) label)]
+      (str "<tr>"
+           "<td><code>" (esc (:id c)) "</code></td>"
+           "<td>" (esc (:client-name c)) "</td>"
+           "<td><code>" (esc (:creator-handle c)) "</code></td>"
+           "<td>" (esc (some-> (:creator-platform c) name)) "</td>"
+           "<td>" (esc (:creator-tieup-fee c)) "</td>"
+           "<td>" (esc (+ (or (:proposed-media-spend c) 0) (or (:creator-tieup-fee c) 0)))
+           " / " (esc (:authorized-budget c)) "</td>"
+           "<td class=\"" (if (:creator-eligibility-issue? c) "err" "muted") "\">"
+           (if (:creator-eligibility-issue? c) "ineligible" "no issue") "</td>"
+           "<td class=\"" (if ok-label? "ok" "err") "\">"
+           (cond
+             (nil? label) "none recorded"
+             ok-label? (esc label)
+             :else (str (esc label) " -- not a published label")) "</td>"
+           "<td class=\"" (if (:tieup-ordered? c) "ok" "muted") "\">"
+           (if (:tieup-ordered? c) (str "ordered (" (esc (:tieup-order-number c)) ")") "not ordered") "</td>"
+           "</tr>"))))
+
 (defn- action-gate-rows []
   (for [[phase-n {:keys [label writes auto]}] (sort-by key phase/phases)]
     (str "<tr>"
@@ -159,6 +230,17 @@
          "<td><code>" (esc (get r "record_id")) "</code></td>"
          "<td><code>" (esc (get r "campaign_id")) "</code></td>"
          "<td>" (esc (get r "jurisdiction")) "</td>"
+         "<td>" (esc (get r "kind")) "</td>"
+         "</tr>")))
+
+(defn- tieup-order-rows [db]
+  (for [r (store/tieup-order-history db)]
+    (str "<tr>"
+         "<td><code>" (esc (get r "record_id")) "</code></td>"
+         "<td><code>" (esc (get r "campaign_id")) "</code></td>"
+         "<td>" (esc (get r "jurisdiction")) "</td>"
+         "<td>" (esc (get r "platform")) "</td>"
+         "<td><code>" (esc (get r "creator_handle")) "</code></td>"
          "<td>" (esc (get r "kind")) "</td>"
          "</tr>")))
 
@@ -201,6 +283,17 @@
     (str/join "\n" (campaign-rows db))
     "</tbody></table>"
 
+    "<h2>Creator tie-up (YouTube / influencer) directory (post-scenario)</h2>"
+    (str "<p class=\"lede\">Sponsorship-disclosure labels are checked against "
+         "<code>advertising.facts/accepted-disclosure-labels</code> -- the wordings the "
+         "jurisdiction&#39;s OWN authority publishes. A recorded-but-unpublished label "
+         "(e.g. 「タイアップ」 in JPN) is the same HARD hold as none at all.</p>")
+    (str "<table><thead><tr><th>id</th><th>client</th><th>creator</th><th>platform</th>"
+         "<th>tie-up fee</th><th>combined spend / authorized</th>"
+         "<th>creator eligibility</th><th>disclosure label</th><th>tie-up order</th></tr></thead><tbody>")
+    (str/join "\n" (tieup-rows db))
+    "</tbody></table>"
+
     "<h2>Action gate (advertising.phase x advertising.governor/high-stakes)</h2>"
     (str "<table><thead><tr><th>phase</th><th>label</th><th>writes allowed</th>"
          "<th>auto-commit eligible (governor-clean)</th><th>always-escalate (high-stakes)</th></tr></thead><tbody>")
@@ -216,6 +309,12 @@
     "<h2>Draft campaign-placement records (advertising.registry, unsigned)</h2>"
     "<table><thead><tr><th>record_id</th><th>campaign_id</th><th>jurisdiction</th><th>kind</th></tr></thead><tbody>"
     (str/join "\n" (placement-rows db))
+    "</tbody></table>"
+
+    "<h2>Draft creator-tie-up order records (advertising.registry, unsigned)</h2>"
+    (str "<table><thead><tr><th>record_id</th><th>campaign_id</th><th>jurisdiction</th>"
+         "<th>platform</th><th>creator_handle</th><th>kind</th></tr></thead><tbody>")
+    (str/join "\n" (tieup-order-rows db))
     "</tbody></table>"
 
     (str "<footer>Source: <code>src/advertising/render_html.clj</code> via <code>clojure -M:dev:render-html</code>. "

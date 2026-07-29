@@ -10,11 +10,13 @@
   proposal and fall back to HOLD -- the advertising analog of `cloud-
   itonami-isic-6512`'s CasualtyGovernor.
 
-  Four checks, in priority order, ALL HARD violations: a human
+  Seven checks, in priority order, ALL HARD violations: a human
   approver CANNOT override them (you don't get to approve your way
   past a fabricated jurisdiction spec-basis, incomplete evidence, a
-  media spend exceeding its own authorized budget, or an unresolved
-  misleading-claim risk). The confidence/actuation gate is SOFT: it
+  media spend exceeding its own authorized budget, an unresolved
+  misleading-claim risk, an ineligible creator, or a creator tie-up
+  ordered with no recognized sponsorship disclosure). The
+  confidence/actuation gate is SOFT: it
   asks a human to look (low confidence / actuation), and the human may
   approve -- but see `advertising.phase`: for `:stake :actuation/
   place-campaign` (a real client-facing act) NO phase ever allows
@@ -89,20 +91,76 @@
                                        the actuation op against an
                                        unscreened campaign -- see this
                                        ns's own test suite.
-    5. Confidence floor / actuation
+    5. Creator ineligible          -- reported by THIS proposal itself
+                                       (a `:creator/screen` that just
+                                       found a disqualifying issue with
+                                       the YouTube channel / influencer
+                                       the campaign wants to commission
+                                       -- e.g. a prior undisclosed-
+                                       endorsement finding), or already
+                                       on file for the campaign
+                                       (`:creator/screen`/`:actuation/
+                                       order-creator-tieup`). Evaluated
+                                       UNCONDITIONALLY, the same
+                                       discipline as check 4 above, so
+                                       the screening op itself can HARD-
+                                       hold on its own finding.
+    6. Creator tie-up evidence
+       incomplete                     -- for `:actuation/order-creator-
+                                       tieup`, has the tie-up actually
+                                       been assessed with a full
+                                       creator-engagement-record/
+                                       disclosure-record/fee-
+                                       authorization-record/creator-
+                                       eligibility-record checklist on
+                                       file (`advertising.facts/tieup-
+                                       evidence-satisfied?`)? The
+                                       tie-up analog of check 2, against
+                                       its OWN separately-cited evidence
+                                       set.
+    7. Sponsorship disclosure
+       missing                        -- for `:actuation/order-creator-
+                                       tieup`, INDEPENDENTLY recompute
+                                       whether the campaign has recorded
+                                       a sponsorship-disclosure label
+                                       that the jurisdiction's OWN
+                                       authority publishes (`advertising.
+                                       registry/disclosure-label-
+                                       missing?` + `advertising.facts/
+                                       disclosure-acceptable?`) -- needs
+                                       no proposal inspection at all.
+                                       A genuinely NEW concept in this
+                                       fleet, grounded in the cited
+                                       disclosure frameworks
+                                       (Japan's 2023 ステマ規制
+                                       designation under 景表法5条3号,
+                                       the FTC Endorsement Guides at
+                                       16 CFR Part 255, CAP Code
+                                       section 2, UWG § 5a Abs. 4) --
+                                       the ONE thing that separates a
+                                       lawful creator tie-up from an
+                                       unlawful stealth-marketing post,
+                                       and the one an LLM has no way to
+                                       verify for itself.
+    8. Confidence floor / actuation
        gate                          -- LLM confidence below threshold,
                                        OR the op is `:actuation/place-
-                                       campaign` (a REAL client-facing
-                                       act) -> escalate.
+                                       campaign` or `:actuation/order-
+                                       creator-tieup` (REAL client- and
+                                       creator-facing acts) -> escalate.
 
-  One more guard, double-placement prevention, is enforced but NOT
-  listed as a numbered HARD check above because it needs no upstream
-  comparison at all -- `already-placed-violations` refuses to place a
-  campaign for the SAME campaign twice, off a dedicated `:campaign-
-  placed?` fact (never a `:status` value) -- the SAME 'check a
-  dedicated boolean, not status' discipline every prior sibling
-  governor's guards establish, informed by `cloud-itonami-isic-6492`'s
-  status-lifecycle bug (ADR-2607071320)."
+  Two more guards, double-actuation prevention for EACH actuation, are
+  enforced but NOT listed as numbered HARD checks above because they
+  need no upstream comparison at all -- `already-placed-violations`
+  refuses to place the SAME campaign twice off a dedicated `:campaign-
+  placed?` fact, and `already-ordered-violations` refuses to order the
+  SAME campaign's creator tie-up twice off a dedicated `:tieup-
+  ordered?` fact (never a `:status` value, for either) -- the SAME
+  'check a dedicated boolean, not status' discipline every prior
+  sibling governor's guards establish, informed by `cloud-itonami-isic-
+  6492`'s status-lifecycle bug (ADR-2607071320). The two guards are
+  kept independent on purpose: placing a campaign is not ordering its
+  tie-up, and a campaign may legitimately do one without the other."
   (:require [advertising.facts :as facts]
             [advertising.registry :as registry]
             [advertising.store :as store]))
@@ -110,25 +168,35 @@
 (def confidence-floor 0.6)
 
 (def high-stakes
-  "Stakes grave enough to always require a human, even when clean.
-  Placing a real campaign on the client's behalf is the ONE real-world
-  actuation event this actor performs -- a single-member set, matching
-  `leasing`'s/`underwriting`'s/`testlab`'s/`clinic`'s/`veterinary`'s/
-  `funeral`'s/`parksafety`'s/`salon`'s/`entertainment`'s/`facility`'s/
-  `consulting`'s single-actuation shape, grounded directly in this
-  blueprint's own README ('No automated proposal, by itself, can
-  complete the following without governor approval and audit
-  evidence: placing/publishing a campaign on the client's behalf')."
-  #{:actuation/place-campaign})
+  "Stakes grave enough to always require a human, even when clean. This
+  actor performs TWO real-world actuation events, and both are members:
+
+    :actuation/place-campaign      -- placing/publishing a campaign on
+                                      the client's behalf
+    :actuation/order-creator-tieup -- commissioning a paid post from a
+                                      named YouTube channel /
+                                      influencer on the client's behalf
+
+  grounded directly in this blueprint's own README ('No automated
+  proposal, by itself, can complete the following without governor
+  approval and audit evidence: placing/publishing a campaign on the
+  client's behalf; ordering a creator tie-up on the client's behalf').
+  The second is not a lesser act than the first: it commits the client
+  to a named third party under that party's own audience, and it is
+  the act a regulator prosecutes when the resulting post is not
+  disclosed as advertising."
+  #{:actuation/place-campaign :actuation/order-creator-tieup})
 
 ;; ----------------------------- checks -----------------------------
 
 (defn- spec-basis-violations
-  "A `:media-plan/verify` (or `:actuation/place-campaign`) proposal
-  with no spec-basis citation is a HARD violation -- never invent a
-  jurisdiction's advertising-standards requirements."
+  "A `:media-plan/verify`/`:tieup/verify` (or either actuation)
+  proposal with no spec-basis citation is a HARD violation -- never
+  invent a jurisdiction's advertising-standards or sponsorship-
+  disclosure requirements."
   [{:keys [op]} proposal]
-  (when (contains? #{:media-plan/verify :actuation/place-campaign} op)
+  (when (contains? #{:media-plan/verify :actuation/place-campaign
+                     :tieup/verify :actuation/order-creator-tieup} op)
     (let [value (:value proposal)]
       (when (or (empty? (:cites proposal))
                 (and (contains? value :spec-basis) (nil? (:spec-basis value))))
@@ -190,6 +258,98 @@
       [{:rule :already-placed
         :detail (str subject " は既にキャンペーン出稿済み")}])))
 
+;; -------------------- creator tie-up (YouTube / influencer) --------------------
+
+(defn- creator-ineligible-violations
+  "A creator (YouTube channel / influencer) carrying an unresolved
+  eligibility issue -- reported by THIS proposal (e.g. a `:creator/
+  screen` that itself just found one), or already on file in the store
+  for the campaign (`:creator/screen`/`:actuation/order-creator-
+  tieup`) -- is a HARD, un-overridable hold. Evaluated UNCONDITIONALLY
+  (not scoped to a specific op) so the screening op itself can HARD-
+  hold on its own finding, exactly as
+  `misleading-claim-risk-unresolved-violations` does above."
+  [{:keys [op subject]} proposal st]
+  (let [hit-in-proposal? (= :ineligible (get-in proposal [:value :verdict]))
+        campaign-id (when (contains? #{:creator/screen :actuation/order-creator-tieup} op) subject)
+        hit-on-file? (and campaign-id (= :ineligible (:verdict (store/creator-screen-of st campaign-id))))]
+    (when (or hit-in-proposal? hit-on-file?)
+      [{:rule :creator-ineligible
+        :detail "適格性に未解決の問題があるクリエイターへのタイアップ発注提案は進められない"}])))
+
+(defn- tieup-evidence-incomplete-violations
+  "For `:actuation/order-creator-tieup`, the jurisdiction's required
+  creator-engagement-record/disclosure-record/fee-authorization-record/
+  creator-eligibility-record evidence must actually be satisfied -- the
+  tie-up analog of `evidence-incomplete-violations`, against its own
+  separately-cited checklist."
+  [{:keys [op subject]} st]
+  (when (= op :actuation/order-creator-tieup)
+    (let [c (store/campaign st subject)
+          brief (store/tieup-brief-of st subject)]
+      (when-not (and brief
+                     (facts/tieup-evidence-satisfied?
+                      (:jurisdiction c) (:checklist brief)))
+        [{:rule :tieup-evidence-incomplete
+          :detail "法域の必要書類(起用契約記録/開示表示記録/報酬承認記録/クリエイター適格性記録等)が充足していない状態での発注提案"}]))))
+
+(defn- tieup-fee-exceeds-authorized-budget-violations
+  "For `:actuation/order-creator-tieup`, INDEPENDENTLY recompute
+  whether the campaign's own media spend PLUS its own creator tie-up
+  fee exceeds its own recorded authorized budget (`advertising.
+  registry/creator-tieup-fee-exceeds-authorized-budget?`) -- needs no
+  proposal inspection at all, since its inputs are permanent ground-
+  truth fields already on the campaign. The tie-up fee is spent ON TOP
+  of the media plan, so a fee that looks affordable on its own can
+  still blow the client's authorization."
+  [{:keys [op subject]} st]
+  (when (= op :actuation/order-creator-tieup)
+    (let [c (store/campaign st subject)]
+      (when (registry/creator-tieup-fee-exceeds-authorized-budget? c)
+        [{:rule :creator-tieup-fee-exceeds-authorized-budget
+          :detail (str subject " の媒体費(" (:proposed-media-spend c)
+                      ")とタイアップ報酬(" (:creator-tieup-fee c)
+                      ")の合計が承認予算(" (:authorized-budget c) ")を超過")}]))))
+
+(defn- sponsorship-disclosure-missing-violations
+  "For `:actuation/order-creator-tieup`, INDEPENDENTLY recompute
+  whether the campaign has recorded a sponsorship-disclosure label
+  that the jurisdiction's OWN authority publishes. Nothing recorded,
+  and something recorded that the authority does not publish, are the
+  SAME HARD hold -- in both cases the agency cannot show a regulator
+  the post was identifiable as advertising, which is the whole point
+  of Japan's ステマ規制 designation, the FTC Endorsement Guides, CAP
+  Code section 2 and UWG § 5a Abs. 4.
+
+  This is the check an LLM structurally cannot stand in for: it has no
+  way to know which wordings a given authority has actually published,
+  and a plausible-sounding invented one (「タイアップ」, 「提供」) is
+  exactly what produces an undisclosed-advertising finding."
+  [{:keys [op subject]} st]
+  (when (= op :actuation/order-creator-tieup)
+    (let [c (store/campaign st subject)]
+      (cond
+        (registry/disclosure-label-missing? c)
+        [{:rule :sponsorship-disclosure-missing
+          :detail (str subject " にスポンサーシップ開示表示(「広告」「PR」等)が記録されていない")}]
+
+        (not (facts/disclosure-acceptable? (:jurisdiction c) (:disclosure-label c)))
+        [{:rule :sponsorship-disclosure-missing
+          :detail (str subject " の開示表示「" (:disclosure-label c)
+                      "」は " (:jurisdiction c)
+                      " の当局が公表する表示例に含まれない")}]))))
+
+(defn- already-ordered-violations
+  "For `:actuation/order-creator-tieup`, refuses to order the SAME
+  campaign's creator tie-up twice, off a dedicated `:tieup-ordered?`
+  fact (never a `:status` value, and never the placement guard's
+  `:campaign-placed?` -- the two actuations are independent)."
+  [{:keys [op subject]} st]
+  (when (= op :actuation/order-creator-tieup)
+    (when (store/tieup-already-ordered? st subject)
+      [{:rule :already-ordered
+        :detail (str subject " は既にクリエイタータイアップ発注済み")}])))
+
 (defn check
   "Censors an AdOps-LLM proposal against the governor rules. Returns
   {:ok? bool :violations [..] :confidence c :escalate? bool
@@ -200,7 +360,12 @@
                            (evidence-incomplete-violations request st)
                            (media-spend-exceeds-authorized-budget-violations request st)
                            (misleading-claim-risk-unresolved-violations request proposal st)
-                           (already-placed-violations request st)))
+                           (already-placed-violations request st)
+                           (creator-ineligible-violations request proposal st)
+                           (tieup-evidence-incomplete-violations request st)
+                           (tieup-fee-exceeds-authorized-budget-violations request st)
+                           (sponsorship-disclosure-missing-violations request st)
+                           (already-ordered-violations request st)))
         conf (:confidence proposal 0.0)
         low? (< conf confidence-floor)
         stakes? (boolean (high-stakes (:stake proposal)))
