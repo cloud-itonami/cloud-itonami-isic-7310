@@ -77,6 +77,24 @@ spend exceeding its own authorized budget forces a hold, not an override. A
 flat fee keeps the governor's budget ceiling and the operator's incentive
 pointing the same way.
 
+**Subscribe (2026-08-10)**: a live Stripe Payment Link for the Managed Starter
+tier (¥80,000/月 flat) is available now —
+[**subscribe to Managed Starter**](https://buy.stripe.com/14A14o86z10Y3vaceeeEo0o).
+This is a no-code Stripe-hosted checkout; nothing in this repo's actor code
+changed. After subscribing, contact gftdcojp to arrange managed-tenant setup
+(manual fulfilment today, no automated onboarding yet). **No agency has claimed
+or subscribed to this tier yet — this is a live, working checkout with zero
+paid tenants, not a claim of existing revenue.**
+
+Note on the ¥80,000 figure: it was anchored on 2026-07-25 against the two
+adjacent public categories above (self-serve campaign-automation SaaS and
+agency-charged managed-ads retainers), *and* aligned with the house Starter
+tier on `cloud-itonami-isic-6399`. That alignment held here because the
+adjacent-category evidence independently supports the number. It is not a
+general licence to carry the portfolio band across verticals — the 2026-08-10
+benchmark round found the ¥50,000–150,000/月 band unsupported in most other
+industries, and each of those repos now carries its own measured price.
+
 **Unit economics (estimate, not measured)** — assumptions stated so they can be
 falsified once a paying operator exists:
 
