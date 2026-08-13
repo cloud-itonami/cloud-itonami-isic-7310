@@ -118,3 +118,48 @@
     (is (string? (:provenance sb)) (str iso3 " has a provenance string"))
     (is (re-find #"^https?://" (:provenance sb)) (str iso3 " provenance is a URL"))
     (is (= 4 (count (:required-evidence sb))) (str iso3 " has the 4-item evidence set"))))
+
+(deftest ind-has-a-cited-spec-basis-and-its-own-published-label-list
+  (let [sb (facts/spec-basis "IND")]
+    (is (some? sb))
+    (is (re-find #"^https://www\.ascionline\.in/" (:provenance sb))
+        "cites an ASCI URL that was actually fetched")
+    (is (= "2026-08-13" (:retrieved-at sb))
+        "records when the citation was read, so staleness is visible")
+    (is (facts/required-evidence-satisfied? "IND" (facts/evidence-checklist "IND"))))
+  (testing "ASCI is unusual in publishing an EXPLICIT label list, so the labels are transcribed rather than paraphrased"
+    (is (facts/disclosure-acceptable? "IND" "Sponsored"))
+    (is (facts/disclosure-acceptable? "IND" "Includes Paid Promotion"))
+    (is (facts/disclosure-acceptable? "IND" "Ad")))
+  (testing "and the transcription is exact: a wording ASCI did not publish is not acceptable even when a neighbouring jurisdiction publishes it"
+    (is (facts/disclosure-acceptable? "USA" "#ad"))
+    (is (not (facts/disclosure-acceptable? "IND" "#ad"))
+        "ASCI publishes \"Ad\", not the hashtag form the FTC illustrates")
+    (is (not (facts/disclosure-acceptable? "IND" "PR"))))
+  (testing "the disclosure basis is a citation of its own, not the ASCI Code row reused"
+    (let [d (facts/disclosure-basis "IND")]
+      (is (re-find #"Influencer Advertising" (:legal-basis d)))
+      (is (not= (:provenance d) (:provenance (facts/spec-basis "IND")))))))
+
+(deftest aus-is-seeded-for-standards-only-so-a-creator-tieup-holds
+  (testing "the AANA code could not be read on the retrieval date, so no disclosure basis was invented for it -- the same posture CHN gets, applied to a second jurisdiction"
+    (is (some? (facts/spec-basis "AUS")))
+    (is (re-find #"^https://www\.accc\.gov\.au/" (:provenance (facts/spec-basis "AUS"))))
+    (is (= "2026-08-13" (:retrieved-at (facts/spec-basis "AUS"))))
+    (is (nil? (facts/disclosure-basis "AUS")))
+    (is (= [] (facts/accepted-disclosure-labels "AUS")))
+    (is (not (facts/disclosure-acceptable? "AUS" "#ad"))
+        "no cited basis -> no label is acceptable, however plausible"))
+  (testing "and the tie-up checklist is absent too, so a tie-up order can never be satisfied there"
+    (is (= [] (facts/tieup-evidence-checklist "AUS")))
+    (is (not (facts/tieup-evidence-satisfied? "AUS" ["Creator-engagement record"
+                                                    "Disclosure record"
+                                                    "Fee-authorization record"
+                                                    "Creator-eligibility record"])))))
+
+(deftest a-row-without-a-disclosure-basis-never-carries-a-tieup-checklist
+  (testing "the invariant behind the CHN and AUS rows, stated once over the whole catalog: offering a tie-up checklist for a jurisdiction whose disclosure rule was never read would advertise a completeness the catalog does not have"
+    (doseq [[iso3 sb] facts/catalog
+            :when (nil? (:disclosure sb))]
+      (is (empty? (:tieup-required-evidence sb))
+          (str iso3 " has no cited disclosure basis, so it must not list tie-up evidence")))))

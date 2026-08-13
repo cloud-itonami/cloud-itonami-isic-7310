@@ -28,7 +28,8 @@
   genuinely separate legal basis from the general advertising-
   standards one above (Japan's 2023 ステマ規制 designation, the FTC
   Endorsement Guides, the CAP Code's recognition rules, UWG § 5a
-  Abs. 4), so it is cited separately rather than folded into
+  Abs. 4, ASCI's Guidelines for Influencer Advertising in Digital
+  Media), so it is cited separately rather than folded into
   `:legal-basis` -- an operator disputing a tie-up order needs the
   disclosure citation specifically.
 
@@ -158,7 +159,60 @@
           ;; Naming the boundary here so a CHN campaign is not mistaken
           ;; for fully screened by this actor alone.
           :out-of-scope-here [:pre-publication-ad-review]
-          :out-of-scope-note "发布前广告审查 (广告批准文号) は本 actor では判定しない — cloud-itonami-iso3166-chn-advertising を参照"}})
+          :out-of-scope-note "发布前广告审查 (广告批准文号) は本 actor では判定しない — cloud-itonami-iso3166-chn-advertising を参照"}
+   ;; India, like GBR, is standard-set by a self-regulatory body (ASCI)
+   ;; rather than by the regulator directly, and -- unusually -- ASCI
+   ;; publishes an EXPLICIT list of permitted disclosure labels, which is
+   ;; exactly what `:accepted-disclosure-labels` is for. Both citations
+   ;; below were fetched and READ on `:retrieved-at`; the label list is
+   ;; transcribed from ASCI's own published list, not paraphrased.
+   "IND" {:name "India"
+          :owner-authority "Advertising Standards Council of India (ASCI)"
+          :legal-basis "The Code for Self-Regulation of Advertising Content in India (ASCI Code), Chapter I -- truthful and honest representation"
+          :national-spec "Advertisements must be truthful; descriptions, claims and comparisons relating to objectively ascertainable fact must be capable of substantiation"
+          :provenance "https://www.ascionline.in/the-asci-code/"
+          :retrieved-at "2026-08-13"
+          :required-evidence ["Client-brief record"
+                              "Media-plan record"
+                              "Creative-approval record"
+                              "Budget-authorization record"]
+          :tieup-required-evidence ["Creator-engagement record"
+                                    "Disclosure record"
+                                    "Fee-authorization record"
+                                    "Creator-eligibility record"]
+          :disclosure
+          {:owner-authority "Advertising Standards Council of India (ASCI)"
+           :legal-basis "ASCI Guidelines for Influencer Advertising in Digital Media (applicable to advertisements published on or after 2021-06-14; Addendum 2 dated 2025-04-07)"
+           :requirement "A social-media influencer must add a disclosure label, drawn from ASCI's own published list, when posting an advertisement, so that it is distinguishable from independent user-generated content"
+           :provenance "https://www.ascionline.in/social/guidelines/"
+           :provenance-secondary "https://www.ascionline.in/wp-content/uploads/2023/08/GUIDELINES-FOR-INFLUENCER-ADVERTISING-IN-DIGITAL-MEDIA.pdf"
+           :retrieved-at "2026-08-13"
+           :accepted-disclosure-labels ["Advertisement" "Ad" "Sponsored" "Collaboration"
+                                        "Partnership" "Employee" "Free gift"
+                                        "Paid Partnership" "Affiliate"
+                                        "Includes Paid Promotion"]}}
+   ;; AUS is seeded for advertising standards ONLY, and the omission is
+   ;; deliberate rather than an oversight. Australia's sponsorship-
+   ;; disclosure rule is generally understood to sit in the AANA Code of
+   ;; Ethics (section 2.7, "clearly distinguishable"), but on
+   ;; `:retrieved-at` the AANA's own published code page returned 404 and
+   ;; its PDF could not be read, so there is nothing here that was
+   ;; actually read from the authority. A disclosure basis reconstructed
+   ;; from secondary summaries is exactly the fabrication this namespace
+   ;; refuses, so `:disclosure` (and, following CHN, the tie-up evidence
+   ;; checklist) is ABSENT and a creator tie-up on AUS therefore HOLDS.
+   ;; Add it when someone reads the AANA code itself.
+   "AUS" {:name "Australia"
+          :owner-authority "Australian Competition and Consumer Commission (ACCC)"
+          :legal-basis "Australian Consumer Law (false or misleading claims), administered by the ACCC under the Competition and Consumer Act 2010 (Cth)"
+          :national-spec "A business must be able to prove any claim it makes or advertises; guessing the facts, omitting relevant information, and vague or unsubstantiated claims are all prohibited"
+          :provenance "https://www.accc.gov.au/business/advertising-and-promotions/false-or-misleading-claims"
+          :provenance-secondary "https://www.legislation.gov.au/C2004A00109/latest/text"
+          :retrieved-at "2026-08-13"
+          :required-evidence ["Client-brief record"
+                              "Media-plan record"
+                              "Creative-approval record"
+                              "Budget-authorization record"]}})
 
 (defn spec-basis
   "The jurisdiction's requirement map, or nil -- nil means NO spec-basis,
