@@ -30,7 +30,9 @@ it", stop. The redundancy is the design.
 | `advertising.phase` | Rollout gate 0→3 |
 | `advertising.advertisingadvisor` | The sealed LLM node. Untrusted |
 | `advertising.operation` | The langgraph StateGraph wiring it together |
+| `advertising.placer` | The actuation seam. Builds buy requests, holds no credential, opens no socket |
 | `advertising.sim` / `advertising.render-html` | `-main` drivers, not library code |
+| `advertising.buy` | The operator's `-main`. **The only file that opens a socket** |
 
 ## Rules that are not negotiable
 
@@ -50,7 +52,28 @@ to catch exactly that. See ADR-0002.
 it does not contact YouTube, Instagram, TikTok or X. Adapters exist in
 the workspace (`kotoba-lang/com-youtube`, `com-googleads`, `adnet`) and
 this repo depends on none of them, on purpose. Any real-world
-integration belongs downstream of a human-approved order.
+integration belongs downstream of a human-approved order — which is
+exactly where `advertising.placer` sits (ADR-0006). The rule has not
+softened: `placer` is pure, builds requests and opens nothing;
+`advertising.buy` is the single file with a socket in it, and a human
+runs it. Do not import `buy` from anything, and do not add I/O to
+`placer` — the moment either happens, "the actor cannot reach a network"
+stops being checkable by reading one file.
+
+**Live and SPENDING are two decisions, and both defaults are off.** A
+campaign created PAUSED is real and charges nothing; only ENABLED
+charges. `--live` alone must never produce ENABLED, and a spending
+placer must always carry `:max-spend-micros` — an operator-set ceiling
+independent of the campaign's own authorized budget the governor
+recomputes. If you find yourself removing one of those two ceilings
+because "the other already covers it", stop; that is the same
+redundancy-is-the-design note as the two actuation layers above.
+
+**A receipt is never optional.** Every `:actuation/place-campaign`
+commit appends a `:placement-dispatch` fact stating `:mode`, `:sent?`
+and the platform. An absent receipt and a dry-run receipt read
+identically to an auditor, so "we sent nothing" must be written down
+rather than left out. Never let a credential value into one.
 
 **Keep the two actuations independent.** Separate guard booleans
 (`:campaign-placed?` / `:tieup-ordered?`), separate sequences, separate
@@ -84,6 +107,9 @@ clojure -M:lint          # errors fail CI
 clojure -M:dev:run       # both lifecycles + all eight HARD holds
 clojure -M:dev:coverage  # cloverage; the README figure comes from here
 clojure -M:dev:render-html   # regenerates docs/samples/operator-console.html
+clojure -M:buy --campaign <id>              # dry run: builds the buy requests, opens nothing
+clojure -M:buy --campaign <id> --live       # real account, campaign PAUSED, zero charge
+# --live --spend --max-spend-jpy N          # ENABLED: this charges the client
 ```
 
 The console must stay byte-identical across reruns — no timestamps, no
