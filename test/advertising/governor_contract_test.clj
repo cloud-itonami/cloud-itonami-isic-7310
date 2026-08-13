@@ -417,6 +417,37 @@
       (is (some #{:platform-restricted-category-unapproved} (-> (store/ledger db) first :basis)))
       (is (nil? (store/platform-check-of db "campaign-12"))))))
 
+(deftest a-policy-nobody-finished-reading-holds-the-campaign
+  (testing "campaign-13 is :lifestyle-household on line-yahoo-ads -- a category the OPEN-set platforms all permit, held here only because that operator's enumerated 掲載基準 has not been read"
+    (let [[db actor] (fresh)
+          res (exec-op actor "x9" {:op :platform/verify :subject "campaign-13"} operator)]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:platform-prohibited-category} (-> (store/ledger db) first :basis)))
+      (is (nil? (store/platform-check-of db "campaign-13")))))
+  (testing "the hold SAYS which kind of no it is -- an unread standard must not wear the same words as a refusal"
+    (let [[db actor] (fresh)]
+      (exec-op actor "x10" {:op :platform/verify :subject "campaign-13"} operator)
+      (let [detail (->> (store/ledger db) first :violations
+                        (filter #(= :platform-prohibited-category (:rule %)))
+                        first :detail)]
+        (is (some? detail))
+        (is (re-find #"policy-read :partial" detail)
+            "the operator reading this must be able to tell 'the platform said no' from 'we did not read it'")
+        (is (not (re-find #"明示的に禁止" detail))))))
+  (testing "the identical category on an open-set platform is placeable, which is what makes the hold above informative rather than noise"
+    (let [[db actor] (fresh)]
+      (exec-op actor "x11" {:op :platform/verify :subject "campaign-10"} operator)
+      (approve! actor "x11")
+      (is (true? (:conformant? (store/platform-check-of db "campaign-10")))))))
+
+(deftest youtube-is-not-simply-google
+  (testing "campaign-14 is :gambling on youtube-ads, which names no categories of its own -- it holds because it incorporates google-ads' restriction AND google-ads' untranscribed country table"
+    (let [[db actor] (fresh)
+          res (exec-op actor "x12" {:op :platform/verify :subject "campaign-14"} operator)]
+      (is (= :hold (get-in res [:state :disposition])))
+      (is (some #{:platform-restricted-category-unapproved} (-> (store/ledger db) first :basis)))
+      (is (nil? (store/platform-check-of db "campaign-14"))))))
+
 (deftest jurisdiction-scoped-attestation-holds-only-where-it-applies
   (testing "campaign-11 runs on meta-ads in DEU and has not made the EU DSA beneficiary/payer disclosure"
     (let [[db actor] (fresh)

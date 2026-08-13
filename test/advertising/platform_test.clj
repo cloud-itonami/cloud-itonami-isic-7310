@@ -12,7 +12,7 @@
   that cheerfully answers ':permitted' for a platform it has never
   heard of would route around it.
 
-  Since ADR-0003 a third thing is under test: that the four seeded
+  Since ADR-0003 a third thing is under test: that the seeded
   platforms are allowed to DISAGREE. The cross-platform tests below
   assert specific disagreements as transcribed, so a future 'tidy-up'
   that harmonises the taxonomies has to delete a test that says, in
@@ -80,16 +80,94 @@
 (deftest cross-platform-disposition-answers-where-can-this-run
   (is (= {"chatgpt-ads" :not-permitted
           "google-ads" :permitted
+          "line-yahoo-ads" :not-transcribed
           "meta-ads" :restricted
-          "microsoft-advertising" :restricted}
-         (into {} (platform/cross-platform-disposition :beauty-cosmetics))))
+          "microsoft-advertising" :restricted
+          "telegram-ads" :permitted
+          "x-ads" :permitted
+          "youtube-ads" :permitted}
+         (into {} (platform/cross-platform-disposition :beauty-cosmetics)))
+      "one question, eight answers -- and the three kinds of 'no' stay distinguishable")
   (testing "a category the OPEN sets do not name resolves permitted there, and is held on the CLOSED one"
     (is (= {"chatgpt-ads" :not-permitted
             "google-ads" :permitted
+            "line-yahoo-ads" :prohibited
             "meta-ads" :permitted
-            "microsoft-advertising" :restricted}
+            "microsoft-advertising" :restricted
+            "telegram-ads" :permitted
+            "x-ads" :permitted
+            "youtube-ads" :permitted}
            (into {} (platform/cross-platform-disposition :ticket-reselling)))
-        "ticket reselling: unnamed by Google and Meta, restricted by Microsoft, and outside ChatGPT's launch list")))
+        "ticket reselling: unnamed by Google and Meta, restricted by Microsoft, outside ChatGPT's launch list, and newly written into LINEヤフー's 第4章 as prohibited")))
+
+(deftest a-partially-read-policy-does-not-answer-permitted
+  (testing "line-yahoo-ads is the only :policy-read :partial entry, and the whole point is that its silence is not a yes"
+    (is (= :partial (:policy-read (platform/policy-basis "line-yahoo-ads"))))
+    (is (= :not-transcribed (platform/category-disposition "line-yahoo-ads" :beauty-cosmetics))
+        "unnamed on a partially-read policy -> we did not read it, so hold"))
+  (testing "what the change document DID state is transcribed normally"
+    (is (= :prohibited (platform/category-disposition "line-yahoo-ads" :tobacco)))
+    (is (= :prohibited (platform/category-disposition "line-yahoo-ads" :ticket-reselling)))
+    (is (= :restricted (platform/category-disposition "line-yahoo-ads" :legal-services))))
+  (testing "and the Japanese professional-body gate is a real country limit, not the unenumerated sentinel"
+    (is (true? (platform/restricted-category-allowed-jurisdiction? "line-yahoo-ads" "JPN")))
+    (is (false? (platform/restricted-category-allowed-jurisdiction? "line-yahoo-ads" "USA"))))
+  (testing "every other entry read its index end to end, so their silence IS a permission"
+    (doseq [pid (keys platform/catalog)
+            :when (not= pid "line-yahoo-ads")]
+      (is (not= :partial (:policy-read (platform/policy-basis pid)))
+          (str pid " must not quietly become partial without the disposition changing")))))
+
+(deftest incorporation-resolves-through-the-platform-the-document-names
+  (testing "YouTube's own overview says the Google Ads policies apply to it, so its categories are Google's -- not a copy that can drift"
+    (is (= "google-ads" (:categories-incorporated-from (platform/policy-basis "youtube-ads"))))
+    (is (empty? (:prohibited-categories (platform/policy-basis "youtube-ads")))
+        "the sets are empty ON PURPOSE: a copy would be a second thing to correct")
+    (doseq [c [:counterfeit :recreational-drugs :weapons :hacking-services]]
+      (is (= :prohibited (platform/category-disposition "youtube-ads" c))
+          (str c " is prohibited on youtube-ads because it is prohibited on google-ads")))
+    (doseq [c [:gambling :healthcare-medical :political :cryptocurrency]]
+      (is (= :restricted (platform/category-disposition "youtube-ads" c)))))
+  (testing "the country rule travels with the taxonomy -- otherwise the incorporating surface would be FREER than the one it incorporated from"
+    (is (false? (platform/restricted-category-allowed-jurisdiction? "youtube-ads" "JPN")))
+    (is (false? (platform/restricted-category-allowed-jurisdiction? "google-ads" "JPN"))
+        "google-ads is :per-category-unenumerated, and youtube-ads must inherit that hold rather than defaulting to 'no limit'"))
+  (testing "YouTube's own additions are its own, and are not inherited by google-ads"
+    (is (contains? (set (platform/required-attestations "youtube-ads")) :distinguishable-from-product-ui))
+    (is (contains? (set (platform/required-attestations "youtube-ads")) :ugc-rights-cleared))
+    (is (not (contains? (set (platform/required-attestations "google-ads")) :ugc-rights-cleared)))
+    (is (= [:youtube-kids] (platform/excluded-context-hits "youtube-ads" [:youtube-kids :news]))
+        "YouTube Kids has its own unread policy, so that context is excluded rather than silently servable"))
+  (testing "incorporation is one hop: a chain would make a correction's blast radius unreadable"
+    (doseq [[pid entry] platform/catalog
+            :let [target (:categories-incorporated-from entry)]
+            :when target]
+      (is (some? (platform/policy-basis target))
+          (str pid " incorporates " target ", which must itself be catalogued"))
+      (is (nil? (:categories-incorporated-from (platform/policy-basis target)))
+          (str pid " -> " target " -> ... : chains are not supported, and no read policy needs one")))))
+
+(deftest x-and-telegram-disagree-with-the-rest-about-drugs
+  (testing "transcribed as published, in opposite directions, from two documents read on the same day"
+    (is (= :restricted (platform/category-disposition "x-ads" :recreational-drugs))
+        "X allows drugs and paraphernalia with pre-authorisation")
+    (is (= :restricted (platform/category-disposition "x-ads" :drug-paraphernalia)))
+    (is (= :prohibited (platform/category-disposition "telegram-ads" :recreational-drugs)))
+    (is (= :prohibited (platform/category-disposition "google-ads" :recreational-drugs)))
+    (is (= :prohibited (platform/category-disposition "microsoft-advertising" :recreational-drugs))))
+  (testing "and X's pre-authorisation is not a free pass: the country tables were not read, so it holds"
+    (is (false? (platform/restricted-category-allowed-jurisdiction? "x-ads" "USA"))))
+  (testing "Telegram prohibits political and religious advocacy outright, where X merely restricts political"
+    (is (= :prohibited (platform/category-disposition "telegram-ads" :political)))
+    (is (= :prohibited (platform/category-disposition "telegram-ads" :religious-content)))
+    (is (= :restricted (platform/category-disposition "x-ads" :political))))
+  (testing "Telegram's 5.7 prohibits the PREDATORY subset of finance, which the vocabulary cannot express, so the whole category is deliberately unnamed rather than over-prohibited"
+    (is (= :permitted (platform/category-disposition "telegram-ads" :financial-services)))
+    (is (not (contains? (:prohibited-categories (platform/policy-basis "telegram-ads"))
+                        :financial-services))))
+  (testing "Telegram publishes a licence gate and no country table, so a licensed advertiser may run medical anywhere"
+    (is (= :restricted (platform/category-disposition "telegram-ads" :healthcare-medical)))
+    (is (true? (platform/restricted-category-allowed-jurisdiction? "telegram-ads" "JPN")))))
 
 (deftest open-and-closed-category-sets-behave-differently
   (testing "an unnamed category is permitted on an open set and held on a closed one"
@@ -173,15 +251,24 @@
            (platform/missing-attestations "meta-ads" "DEU" attested)))
     (is (= [] (platform/missing-attestations "meta-ads" "JPN" attested)))))
 
-(deftest generative-attestation-follows-the-surface-not-the-fleet
-  (testing "only the generative-surface platform requires ad/answer distinguishability"
+(deftest distinguishability-follows-each-policy-not-the-generative-flag
+  (testing "the generative surface requires ad/answer distinguishability, and it is not the only one that requires it"
+    (is (true? (platform/generative-surface? "chatgpt-ads")))
     (is (contains? (set (platform/required-attestations "chatgpt-ads"))
-                   :distinguishable-from-product-ui))
-    (doseq [pid ["google-ads" "meta-ads" "microsoft-advertising"]]
+                   :distinguishable-from-product-ui)))
+  (testing "platforms that publish no such duty do not inherit it -- the attestation is transcribed, never propagated"
+    (doseq [pid ["google-ads" "meta-ads" "microsoft-advertising" "x-ads" "telegram-ads"]]
       (is (false? (platform/generative-surface? pid)))
       (is (not (contains? (set (platform/required-attestations pid))
                           :distinguishable-from-product-ui))
-          (str pid " is not a generative surface and must not inherit the attestation")))))
+          (str pid " publishes no product-mimicry rule and must not inherit the attestation"))))
+  (testing "and two NON-generative platforms do require it, because their own documents impose it for their own reason -- so the attestation must never be re-derived from :generative-surface?"
+    (doseq [pid ["youtube-ads" "line-yahoo-ads"]]
+      (is (false? (platform/generative-surface? pid))
+          (str pid " is not a generative surface"))
+      (is (contains? (set (platform/required-attestations pid))
+                     :distinguishable-from-product-ui)
+          (str pid " forbids creatives that imitate its own product surface, generative or not")))))
 
 ;; ----------------------------- attestations -----------------------------
 

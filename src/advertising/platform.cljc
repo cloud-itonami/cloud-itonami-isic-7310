@@ -24,7 +24,7 @@
   because an absent one holds and an invented one waves a campaign
   through.
 
-  ## The four seeded platforms disagree, on purpose
+  ## The seeded platforms disagree, on purpose
 
   Every entry here was transcribed from a direct read of the
   platform's own published policy index (see each entry's
@@ -32,19 +32,44 @@
   and that is the whole argument for modelling platforms separately
   rather than keeping one 'advertising rules' table:
 
-  | category                | chatgpt-ads   | google-ads | meta-ads   | microsoft-advertising |
-  |-------------------------|---------------|------------|------------|-----------------------|
-  | `:travel-experiences`   | permitted     | permitted  | permitted  | RESTRICTED            |
-  | `:legal-services`       | PROHIBITED    | permitted  | permitted  | restricted            |
-  | `:political`            | prohibited    | RESTRICTED | restricted | PROHIBITED            |
-  | `:beauty-cosmetics`     | not-permitted | permitted  | restricted | restricted            |
+  | category                | chatgpt-ads   | google-ads | meta-ads   | microsoft-advertising | x-ads      | telegram-ads |
+  |-------------------------|---------------|------------|------------|-----------------------|------------|--------------|
+  | `:travel-experiences`   | permitted     | permitted  | permitted  | RESTRICTED            | permitted  | permitted    |
+  | `:legal-services`       | PROHIBITED    | permitted  | permitted  | restricted            | permitted  | permitted    |
+  | `:political`            | prohibited    | RESTRICTED | restricted | PROHIBITED            | RESTRICTED | PROHIBITED   |
+  | `:beauty-cosmetics`     | not-permitted | permitted  | restricted | restricted            | permitted  | permitted    |
+  | `:recreational-drugs`   | prohibited    | PROHIBITED | prohibited | PROHIBITED            | RESTRICTED | prohibited   |
 
-  A single 'is this ad OK?' predicate cannot be right for all four.
-  The campaign's `:ad-category` is drawn from one shared
-  `category-vocabulary` so the SAME declared category resolves
-  differently per platform, which is exactly the fact an agency needs
-  surfaced before it buys. `cross-platform-disposition` answers it
-  directly.
+  The last row is the newest one and the sharpest: X puts recreational
+  drugs and paraphernalia behind pre-authorisation where every other
+  seeded platform refuses them outright. A single 'is this ad OK?'
+  predicate cannot be right for all of them. The campaign's
+  `:ad-category` is drawn from one shared `category-vocabulary` so the
+  SAME declared category resolves differently per platform, which is
+  exactly the fact an agency needs surfaced before it buys.
+  `cross-platform-disposition` answers it directly.
+
+  ## Two things an entry can be, besides right or absent
+
+  A platform-side gate has more than two states, and flattening them is
+  how it stops protecting anyone:
+
+  - **`:policy-read :partial`** -- the standard exists and is published,
+    but only part of it could be read (`line-yahoo-ads`: the enumerated
+    掲載基準 renders via JavaScript and served a loading error to every
+    fetch). Under the open-set rule an unnamed category would resolve
+    `:permitted`, so the entry would wave through precisely the
+    categories nobody read. Instead it resolves `:not-transcribed` and
+    the governor HOLDS. Reading the rest is the extension task;
+    relaxing the flag is not.
+  - **`:categories-incorporated-from`** -- the platform's own document
+    says another platform's policy applies to it (`youtube-ads`: 'To
+    place ads on YouTube, you'll have to comply with: Google Ad
+    Policies'). Categories AND the restricted-category country rule
+    resolve through that platform, so a correction there reaches here
+    instead of drifting. This is only ever set from a transcribed
+    sentence -- never because two surfaces look similar, which the
+    paragraph above forbids.
 
   ## Why a GENERATIVE surface needs its own gate
 
@@ -62,9 +87,19 @@
   guidance states generally (an ad should be identifiable as an ad),
   which is why `:generative-surface?` is a per-platform FACT here and
   `:distinguishable-from-product-ui` a required attestation there.
-  None of the other three seeded platforms is a generative surface,
-  and none of them carries that attestation -- the requirement follows
-  the surface, not the fleet."
+
+  The requirement follows the surface, not the fleet -- and, since the
+  2026-08-13 additions, that cuts BOTH ways. `chatgpt-ads` is still the
+  only `:generative-surface?` entry, but two non-generative platforms
+  now carry the same attestation because their own documents impose it
+  for a different reason: YouTube forbids ads that mimic YouTube site
+  elements, and LINEヤフー forbids creatives that imitate LINEヤフー
+  service design. The duty is confusability with the product's own
+  content; a model is one way to create that, and a feed that looks
+  like the messenger around it is another. Reading
+  `:distinguishable-from-product-ui` as 'the generative-surface flag'
+  would therefore be wrong, and would drop it from two platforms that
+  publish it."
   (:require [clojure.set :as set]))
 
 (def category-vocabulary
@@ -157,6 +192,24 @@
                                     positively assert before placing.
     :jurisdiction-attestations   -- iso3 -> additional attestations
                                     required only when running there.
+    :policy-read                 -- :index-complete when the policy
+                                    index itself was read end to end,
+                                    so 'this category is unnamed' is a
+                                    fact about the POLICY. :partial
+                                    when only part of the published
+                                    standard could be read, so an
+                                    unnamed category is a fact about
+                                    THIS ENTRY and resolves
+                                    :not-transcribed (a hold). Absent
+                                    means :index-complete.
+    :categories-incorporated-from
+                                 -- another platform-id whose category
+                                    taxonomy this policy adopts BY ITS
+                                    OWN WORDS. Only ever set when the
+                                    platform's document says so; it is
+                                    not a shortcut for 'these two look
+                                    similar', which the ns docstring
+                                    forbids.
     :transcription-notes         -- what this entry does NOT capture,
                                     and where a conservative reading
                                     was taken."
@@ -444,7 +497,216 @@
          "Content' are landing-page/site-quality failures rather than ad categories and "
          "are deliberately excluded from category-vocabulary. "
          "5) Country eligibility for restricted categories is not enumerated on these "
-         "index pages, hence :per-category-unenumerated.")}})
+         "index pages, hence :per-category-unenumerated.")}
+
+   ;; ------------------------------------------------------------------
+   "x-ads"
+   {:name "X Ads"
+    :operator "X Corp."
+    :policy-basis "X Advertising Policies"
+    :policy-version "policy index, read 2026-08-13 (document states no version number)"
+    :provenance "https://business.x.com/en/help/ads-policies.html"
+    :read-on "2026-08-13"
+    :generative-surface? false
+    :closed-category-set? false
+    :policy-read :index-complete
+    :permitted-categories #{}
+    :restricted-categories #{:adult-sexual
+                             :alcohol
+                             :recreational-drugs
+                             :drug-paraphernalia
+                             :financial-services
+                             :gambling
+                             :online-gaming
+                             :healthcare-medical
+                             :political
+                             :tobacco}
+    :restricted-category-jurisdictions :per-category-unenumerated
+    :prohibited-categories #{:fraud-deception
+                             :weapons}
+    :excluded-placement-contexts #{}
+    :required-attestations #{:advertiser-identity-verified}
+    :jurisdiction-attestations {}
+    :transcription-notes
+    (str "Transcribed from the policy index's own two headings (Prohibited "
+         "Content / Restricted Content). "
+         "1) NOTE the headline disagreement, transcribed as published: X puts "
+         ":recreational-drugs and :drug-paraphernalia under RESTRICTED "
+         "(pre-authorisation), where google-ads and microsoft-advertising both "
+         "PROHIBIT them, and telegram-ads prohibits them too. Do not harmonise. "
+         "2) The index lists 'Prohibited Content for Minors' and 'Unacceptable "
+         "Content' as prohibited headings, but their enumerations live on sub-pages "
+         "that were NOT read, so no categories were inferred from the heading names. "
+         "An entry that guessed 'Unacceptable Content' meant hate + violence would be "
+         "asserting a taxonomy nobody read. "
+         "3) X states pre-authorisation must be APPROVED before a restricted-category "
+         "campaign launches, which the governor already enforces via "
+         ":advertiser-approval-on-file?; the per-category country tables are on the "
+         "sub-pages, hence :per-category-unenumerated. "
+         "4) 'Paid Partnerships policy' and 'Anti-Discriminatory Targeting Policy' are "
+         "listed under Campaign Considerations and are targeting/disclosure duties "
+         "rather than ad categories -- the disclosure half is already modelled "
+         "jurisdiction-side in advertising.facts.")}
+
+   ;; ------------------------------------------------------------------
+   "telegram-ads"
+   {:name "Telegram Ads"
+    :operator "Telegram"
+    :policy-basis "Telegram Ad Policies and Guidelines"
+    :policy-version "guidelines page, read 2026-08-13 (document states no version number)"
+    :provenance "https://promote.telegram.org/guidelines"
+    :read-on "2026-08-13"
+    :generative-surface? false
+    :closed-category-set? false
+    :policy-read :index-complete
+    :permitted-categories #{}
+    :restricted-categories #{:healthcare-medical}
+    :prohibited-categories #{:adult-sexual
+                             :nudity-suggestive
+                             :dating
+                             :explicit-violence
+                             :hate-harassment
+                             :counterfeit
+                             :copyrighted-content
+                             :trademark
+                             :piracy
+                             :political
+                             :religious-content
+                             :sensitive-events
+                             :gambling
+                             :health-claims
+                             :alcohol
+                             :tobacco
+                             :recreational-drugs
+                             :drug-paraphernalia
+                             :weapons
+                             :explosives
+                             :malware-phishing
+                             :hacking-services
+                             :traffic-inflation
+                             :forged-documents
+                             :human-exploitation
+                             :human-body-parts}
+    :excluded-placement-contexts #{}
+    :required-attestations #{:landing-page-consistency
+                             :editorial-standards}
+    :jurisdiction-attestations {}
+    :transcription-notes
+    (str "Transcribed from section 5 (Prohibited content) of the guidelines, "
+         "clause by clause. "
+         "1) Telegram publishes NO pre-authorisation tier and NO country table. The "
+         "single :restricted entry is 5.8, which permits medical products only where "
+         "'sellers must be properly licensed' -- a licence gate, so it is recorded as "
+         "restricted with no :restricted-category-jurisdictions key at all (the "
+         "platform declares no country limit), and the governor's advertiser-approval "
+         "check carries the licence. "
+         "2) 5.7 prohibits DECEPTIVE OR HARMFUL financial products (payday lending, "
+         "pyramid schemes, guaranteed-return offers) and not financial services as a "
+         "category, so :financial-services is deliberately NOT listed as prohibited. "
+         "The vocabulary cannot express 'the predatory subset of a category', and "
+         "widening the prohibition to the whole category would hold campaigns Telegram "
+         "does accept. "
+         "3) 5.4 (deceptive/misleading advertising), section 2 (editorial requirements) "
+         "and section 4 (destination requirements) are creative and landing-page "
+         "properties rather than ad categories, and are recorded as the two "
+         "attestations an agency can meaningfully assert per campaign. "
+         "4) The document ends 'All examples on this page are non-exhaustive', which is "
+         "an explicit reserve clause: a clean verdict here is necessary, not "
+         "sufficient. Hence :closed-category-set? false.")}
+
+   ;; ------------------------------------------------------------------
+   "youtube-ads"
+   {:name "YouTube Ads"
+    :operator "Google"
+    :policy-basis "YouTube Ad policy overview"
+    :policy-version "policy overview page, read 2026-08-13 (document states no version number)"
+    :provenance "https://support.google.com/youtube/answer/188570"
+    :provenance-secondary "https://support.google.com/adspolicy/answer/6008942"
+    :read-on "2026-08-13"
+    :generative-surface? false
+    :closed-category-set? false
+    :policy-read :index-complete
+    :categories-incorporated-from "google-ads"
+    :permitted-categories #{}
+    :restricted-categories #{}
+    :prohibited-categories #{}
+    :excluded-placement-contexts #{:youtube-kids}
+    :required-attestations #{:landing-page-consistency
+                             :editorial-standards
+                             :distinguishable-from-product-ui
+                             :ugc-rights-cleared}
+    :jurisdiction-attestations {}
+    :transcription-notes
+    (str "This entry exists because 'we support Google Ads' does NOT answer 'can we "
+         "run this on YouTube?'. YouTube's own overview states the incorporation in "
+         "its own words -- 'To place ads on YouTube, you'll have to comply with: "
+         "Google Ad Policies' -- so :categories-incorporated-from is a transcribed "
+         "fact, not a guess that two Google surfaces must be alike. Every category "
+         "therefore resolves through google-ads, and a future correction to that "
+         "entry reaches YouTube automatically instead of drifting. "
+         "1) The YouTube-SPECIFIC policies the overview names on top of the Google set "
+         "are 'Mimicking YouTube site elements' and 'User-generated content in ads'. "
+         "Those are creative properties, recorded as the two extra attestations. Note "
+         "that :distinguishable-from-product-ui appears here on a NON-generative "
+         "surface: the requirement follows confusability with the product's own "
+         "content, not the presence of a model. "
+         "2) YouTube Kids has its own advertising policies (answer/6168681) which were "
+         "NOT read, so :youtube-kids is recorded as an EXCLUDED placement context "
+         "rather than left silently servable. Transcribe that page to lift it. "
+         "3) Ad formats & features and Targeting & serving are also named on the "
+         "overview and are not category policy; they are not captured here.")}
+
+   ;; ------------------------------------------------------------------
+   ;; The only :policy-read :partial entry, and the reason that key exists.
+   "line-yahoo-ads"
+   {:name "LINEヤフー広告 (LINE Ads / Yahoo! JAPAN Ads, unified)"
+    :operator "LINEヤフー株式会社 (LY Corporation)"
+    :policy-basis "LINEヤフー広告 広告アカウント審査基準・広告掲載基準の統一について"
+    :policy-version "2025/11/17 (document states this date; new criteria apply from 2026 spring)"
+    :provenance "https://www.lycbiz.com/sites/default/files/media/jp/terms-and-policies/pdf/ly/LINE%E3%83%A4%E3%83%95%E3%83%BC%E5%BA%83%E5%91%8A%E3%82%A2%E3%82%AB%E3%82%A6%E3%83%B3%E3%83%88%E5%AF%A9%E6%9F%BB%E5%9F%BA%E6%BA%96%E3%83%BB%E5%BA%83%E5%91%8A%E6%8E%B2%E8%BC%89%E5%9F%BA%E6%BA%96%E3%81%AE%E7%B5%B1%E4%B8%80%E3%81%AB%E3%81%A4%E3%81%84%E3%81%A6.pdf"
+    :provenance-secondary "https://www.lycbiz.com/jp/service/ly/quality/adreview/"
+    :read-on "2026-08-13"
+    :generative-surface? false
+    :closed-category-set? false
+    :policy-read :partial
+    :permitted-categories #{}
+    :restricted-categories #{:legal-services}
+    :restricted-category-jurisdictions #{"JPN"}
+    :prohibited-categories #{:tobacco
+                             :ticket-reselling}
+    :excluded-placement-contexts #{}
+    :required-attestations #{:distinguishable-from-product-ui}
+    :jurisdiction-attestations {}
+    :transcription-notes
+    (str "READ ONLY IN PART, and the entry says so in data (:policy-read :partial) "
+         "rather than only in this note. The enumerated 広告掲載基準 lives on "
+         "ads-help.yahoo-net.jp, which renders its content with JavaScript and served "
+         "nothing but a loading error to every fetch attempted on :read-on. What WAS "
+         "read is the operator's own published change document (the PDF in "
+         ":provenance), which quotes the standard's structure and several clauses "
+         "verbatim. "
+         "1) Because the read is partial, a category this entry does not name resolves "
+         ":not-transcribed and the governor HOLDS. Under the open-set rule the other "
+         "entries use it would have resolved :permitted -- that is, the entry would "
+         "have waved through every category nobody read, which is the failure this "
+         "actor exists to prevent. Reading the help pages is the extension task; "
+         "relaxing :policy-read is not. "
+         "2) :tobacco is 第4章3(12)たばこ. The document records a live carve-out: "
+         "電子たばこ moves OUT of the prohibited-products list but is expected to remain "
+         "unservable on most surfaces via 掲載制限, with the affected surfaces published "
+         "only from 2026-04-01. The vocabulary cannot split :tobacco, so the "
+         "conservative whole-category prohibition stands until that list is readable. "
+         "3) :ticket-reselling is 第4章3(12)チケット不正転売, newly written into the text "
+         "having previously been held under the catch-all その他当社が不適切と判断したもの. "
+         "4) :legal-services is 第5章 業種、商品、サービスごとの掲載基準があるもの for "
+         "国家資格を有する業種 (弁護士・司法書士・行政書士・弁理士・公認会計士・税理士): "
+         "servable only with 所属会 registration, published fee schedule and no "
+         "outstanding disciplinary action -- a Japanese professional-body gate, hence "
+         ":restricted-category-jurisdictions #{\"JPN\"}. "
+         "5) 第2章(3)/第8章(2) forbid creatives that imitate LINEヤフー service design, "
+         "which is the same distinguishability duty ChatGPT states for a generative "
+         "surface, arrived at from the opposite direction -- a feed that looks like the "
+         "messenger around it.")}})
 
 (defn policy-basis
   "The platform's policy map, or nil -- nil means NO policy-basis, and
@@ -468,16 +730,34 @@
   at all when the policy declares a CLOSED category set (ChatGPT's
   'all other categories are not allowed at launch'). When the set is
   open, an unnamed category is `:permitted` -- the platform has not
-  spoken, and this namespace does not speak for it."
+  spoken, and this namespace does not speak for it.
+
+  `:not-transcribed` is the third answer, and the one that keeps the
+  other two honest. It is returned when the entry declares
+  `:policy-read :partial`: the platform HAS spoken about this category,
+  we simply have not read what it said. That is a fact about this
+  catalog, not about the policy, and it must not wear the same face as
+  `:permitted` -- an unread standard resolving to 'allowed' is exactly
+  how a gate reports a pass it never measured. The governor holds on it.
+
+  A `:categories-incorporated-from` entry resolves through the platform
+  it names, because its own document says that platform's policies
+  apply to it. The delegation is one hop by construction (a chain would
+  mean a platform incorporating a platform that incorporates another,
+  which no read policy does) and `platform_test` pins that."
   [platform-id category]
   (if-let [{:keys [permitted-categories restricted-categories
-                   prohibited-categories closed-category-set?]}
+                   prohibited-categories closed-category-set?
+                   policy-read categories-incorporated-from]}
            (policy-basis platform-id)]
     (cond
       (contains? (or prohibited-categories #{}) category) :prohibited
       (contains? (or restricted-categories #{}) category) :restricted
       (contains? (or permitted-categories #{}) category)  :permitted
+      categories-incorporated-from
+      (category-disposition categories-incorporated-from category)
       closed-category-set?                                :not-permitted
+      (= :partial policy-read)                            :not-transcribed
       :else                                               :permitted)
     :no-policy-basis))
 
@@ -494,11 +774,21 @@
     campaign run in a country the platform may well forbid it in, on
     the strength of a table nobody read. The fix is to transcribe the
     table, not to relax the predicate.
-  - no key at all -> the platform declares no jurisdiction limit."
+  - no key at all -> the platform declares no jurisdiction limit,
+    UNLESS the entry incorporates another platform's taxonomy, in which
+    case the country rule is incorporated with it. Without that hop a
+    surface would inherit a category as `:restricted` and then be freer
+    about WHERE it may run than the policy it inherited it from, which
+    is a hole shaped exactly like the one this predicate exists to
+    close."
   [platform-id iso3]
-  (let [allowed (:restricted-category-jurisdictions (policy-basis platform-id) ::absent)]
+  (let [entry   (policy-basis platform-id)
+        allowed (:restricted-category-jurisdictions entry ::absent)]
     (cond
-      (= ::absent allowed)                   (some? (policy-basis platform-id))
+      (and (= ::absent allowed) (:categories-incorporated-from entry))
+      (restricted-category-allowed-jurisdiction?
+       (:categories-incorporated-from entry) iso3)
+      (= ::absent allowed)                   (some? entry)
       (= :per-category-unenumerated allowed) false
       :else                                  (contains? allowed iso3))))
 

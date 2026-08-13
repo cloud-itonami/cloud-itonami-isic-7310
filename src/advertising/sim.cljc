@@ -186,6 +186,12 @@
     (println "== platform/verify campaign-12 (microsoft-advertising, :travel-experiences RESTRICTED there but permitted on chatgpt-ads -> HARD hold) ==")
     (println (exec! actor "t17" {:op :platform/verify :subject "campaign-12"} operator))
 
+    (println "== platform/verify campaign-13 (line-yahoo-ads, :policy-read :partial -> :not-transcribed, HARD hold: we did not read it, the platform did not refuse it) ==")
+    (println (exec! actor "t18" {:op :platform/verify :subject "campaign-13"} operator))
+
+    (println "== platform/verify campaign-14 (youtube-ads, :gambling restricted BY INCORPORATION from google-ads, country table untranscribed -> HARD hold) ==")
+    (println (exec! actor "t19" {:op :platform/verify :subject "campaign-14"} operator))
+
     (println "== audit ledger ==")
     (doseq [f (store/ledger db)] (println f))
 

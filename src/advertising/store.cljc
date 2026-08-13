@@ -222,6 +222,33 @@
                  :misleading-claim-risk-unresolved? false
                  :campaign-placed? false
                  :jurisdiction "JPN" :status :intake})
+    ;; line-yahoo-ads, :policy-read :partial. :lifestyle-household is a
+    ;; category the operator's enumerated 掲載基準 very probably permits --
+    ;; and this campaign HOLDS anyway, because that standard renders via
+    ;; JavaScript and nobody has read it. It is the demo of the difference
+    ;; between 'the platform said no' and 'we did not read what it said':
+    ;; on any OPEN-set platform this identical campaign is placeable.
+    "campaign-13" (merge clean-platform-facts
+                 {:id "campaign-13" :client-name "Nagoya Futon"
+                 :target-platform "line-yahoo-ads"
+                 :ad-category :lifestyle-household
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+    ;; youtube-ads incorporates google-ads by its own words, so :gambling is
+    ;; RESTRICTED here without youtube-ads naming a single category itself --
+    ;; and the country table it inherits is the untranscribed one, so it
+    ;; holds for the same reason campaign-12 does. Buying YouTube is not
+    ;; 'we support Google Ads'.
+    "campaign-14" (merge clean-platform-facts
+                 {:id "campaign-14" :client-name "Setouchi Boat Race"
+                 :target-platform "youtube-ads"
+                 :ad-category :gambling
+                 :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
 
     ;; ---- creator tie-up (YouTube / influencer) lifecycle, ADR-0004 ----
     ;; clean: 500000 media + 200000 fee = 700000, within the 800000 the
