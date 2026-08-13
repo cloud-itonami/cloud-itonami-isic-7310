@@ -392,23 +392,34 @@
 
 (defn- platform-prohibited-category-violations
   "The campaign's own declared ad category is one the platform's own
-  policy refuses -- either named as prohibited, or unnamed under a
-  CLOSED category set (a platform that says 'every category we have
-  not listed is disallowed'). Computed from the campaign's own
-  permanent field against the transcribed policy; needs no proposal
-  inspection."
+  policy refuses -- named as prohibited, unnamed under a CLOSED
+  category set (a platform that says 'every category we have not listed
+  is disallowed'), or unnamed in an entry whose policy was only read in
+  part. Computed from the campaign's own permanent field against the
+  transcribed policy; needs no proposal inspection.
+
+  The third case is a hold for a different reason than the first two,
+  and the detail says which: the platform did not refuse the category,
+  WE did not read whether it does. Collapsing 'the policy says no' and
+  'nobody read the policy' into one silent verdict is how an unmeasured
+  check comes to look like a passed one, so they hold with different
+  words and the operator can tell them apart."
   [{:keys [op subject]} st]
   (when (contains? platform-gated-ops op)
     (let [c (store/campaign st subject)
           pid (:target-platform c)
           disp (platform/category-disposition pid (:ad-category c))]
-      (when (contains? #{:prohibited :not-permitted} disp)
+      (when (contains? #{:prohibited :not-permitted :not-transcribed} disp)
         [{:rule :platform-prohibited-category
           :detail (str "広告カテゴリ " (pr-str (:ad-category c))
                        " は媒体 " (pr-str pid) " のポリシー上 "
-                       (if (= disp :prohibited)
-                         "明示的に禁止"
-                         "未掲載(当該媒体は未掲載カテゴリを一律不許可と宣言)"))}]))))
+                       (case disp
+                         :prohibited "明示的に禁止"
+                         :not-permitted "未掲載(当該媒体は未掲載カテゴリを一律不許可と宣言)"
+                         :not-transcribed
+                         (str "可否を判定できない — 当該媒体の掲載基準は一部しか転記されておらず"
+                              "(:policy-read :partial)、このカテゴリについて媒体が何と言っているかを"
+                              "読んでいない(未読は hold。転記が拡張作業であって、判定の緩和ではない)")))}]))))
 
 (defn- platform-restricted-category-unapproved-violations
   "The category is servable on this platform ONLY for a pre-approved

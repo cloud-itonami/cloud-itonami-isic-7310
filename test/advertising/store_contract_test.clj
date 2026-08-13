@@ -22,7 +22,8 @@
       (is (= 900000 (:proposed-media-spend (store/campaign s "campaign-3"))))
       (is (true? (:misleading-claim-risk-unresolved? (store/campaign s "campaign-4"))))
       (is (false? (:campaign-placed? (store/campaign s "campaign-1"))))
-      (is (= ["campaign-1" "campaign-10" "campaign-11" "campaign-12" "campaign-2"
+      (is (= ["campaign-1" "campaign-10" "campaign-11" "campaign-12" "campaign-13"
+              "campaign-14" "campaign-2"
               "campaign-21" "campaign-22" "campaign-23" "campaign-24" "campaign-25"
               "campaign-3" "campaign-4" "campaign-5" "campaign-6" "campaign-7"
               "campaign-8" "campaign-9"]

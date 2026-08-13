@@ -212,6 +212,20 @@
     ;; :platform-restricted-category-unapproved.
     (exec! actor "t20" {:op :platform/verify :subject "campaign-12"})
 
+    ;; campaign-13: line-yahoo-ads, :lifestyle-household -- a category every
+    ;; open-set platform here PERMITS. It holds anyway, and for a different
+    ;; reason than any hold above: that operator's enumerated 掲載基準 renders
+    ;; via JavaScript and has not been read, so the entry is :policy-read
+    ;; :partial and the category resolves :not-transcribed. The detail says
+    ;; 'we did not read this', not 'the platform refused it'.
+    (exec! actor "t21" {:op :platform/verify :subject "campaign-13"})
+
+    ;; campaign-14: youtube-ads, :gambling -- youtube-ads names no category of
+    ;; its own; YouTube's overview says the Google Ads policies apply to it, so
+    ;; the restriction AND the untranscribed country table are incorporated
+    ;; from google-ads -> HARD hold. Buying YouTube is not 'we support Google'.
+    (exec! actor "t22" {:op :platform/verify :subject "campaign-14"})
+
     ;; campaign-6: jurisdiction evidence cleared, then placement attempted.
     ;; TWO platform-side rules accumulate in one decision --
     ;; :platform-check-incomplete (no conformance assessment on file, because

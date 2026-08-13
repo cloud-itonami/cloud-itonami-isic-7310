@@ -353,7 +353,7 @@ acts on it afterwards.
 | `src/advertising/store.cljc` | **Store** protocol -- `MemStore` ‖ `DatomicStore` (`langchain.db`) + append-only audit ledger + campaign-placement history. No dynamically-filed sub-record -- the actuation op acts directly on a pre-seeded campaign, and the double-actuation guard checks a dedicated `:campaign-placed?` boolean rather than a `:status` value |
 | `src/advertising/registry.cljc` | Campaign-placement draft records, plus `media-spend-exceeds-authorized-budget?` -- the SEVENTH instance of this fleet's MAXIMUM-ceiling check family (`facility`/`school`/`card`/`recovery`/`care`/`navigator` established the first six) |
 | `src/advertising/facts.cljc` | Per-jurisdiction advertising-standards catalog with an official spec-basis citation per entry, honest coverage reporting. **CHN carries an explicit `:out-of-scope-here`**: China's pre-publication review gate (广告法第四十六条's 广告批准文号) is a conditional, category-dependent HARD gate with its own validity window — a catalog row cannot express it, so [`cloud-itonami-iso3166-chn-advertising`](https://github.com/cloud-itonami/cloud-itonami-iso3166-chn-advertising) implements it and this row names the boundary rather than implying full coverage |
-| `src/advertising/platform.cljc` | Per-media-platform ad-policy catalog (ADR-0002 / ADR-0003) -- 4 platforms (`chatgpt-ads`, `google-ads`, `meta-ads`, `microsoft-advertising`) over one shared `category-vocabulary`; category taxonomy, open-vs-closed category sets, restricted-category jurisdictions, excluded placement contexts, base + jurisdiction-scoped attestations and `:generative-surface?`, each transcribed from a DIRECT read of the platform's own published policy with the URL, version and read date recorded; `cross-platform-disposition` + honest coverage reporting |
+| `src/advertising/platform.cljc` | Per-media-platform ad-policy catalog (ADR-0002 / ADR-0003) -- 8 platforms (`chatgpt-ads`, `google-ads`, `meta-ads`, `microsoft-advertising`, `x-ads`, `telegram-ads`, `youtube-ads`, `line-yahoo-ads`) over one shared `category-vocabulary`; category taxonomy, open-vs-closed category sets, restricted-category jurisdictions, excluded placement contexts, base + jurisdiction-scoped attestations and `:generative-surface?`, each transcribed from a DIRECT read of the platform's own published policy with the URL, version and read date recorded; `cross-platform-disposition` + honest coverage reporting. Two entries carry the states a two-valued gate cannot express: `:policy-read :partial` (LINEヤフー -- an unnamed category resolves `:not-transcribed` and HOLDS, because an unread standard must not answer `:permitted`) and `:categories-incorporated-from` (YouTube -- categories and the country rule resolve through `google-ads`, which YouTube's own overview says applies to it) |
 | `src/advertising/advertisingadvisor.cljc` | **AdOps-LLM** -- `mock-advisor` ‖ `llm-advisor`; intake/media-plan-verification/media-platform-conformance/misleading-claim-risk-screening/campaign-placement proposals |
 | `src/advertising/governor.cljc` | **Campaign Governor** -- 4 jurisdiction-side HARD checks (spec-basis · evidence-incomplete · media-spend-exceeds-authorized-budget, pure ground-truth ceiling recompute · misleading-claim-risk-unresolved, unconditional evaluation, the THIRTY-EIGHTH grounding of this discipline, a genuinely new concept grounded in this blueprint's own Trust Control text) + already-placed guard + 6 media-platform-side HARD checks (ADR-0002) + 1 soft (confidence/actuation gate) |
 | `src/advertising/phase.cljc` | **Phase 0→3** -- read-only → assisted intake → assisted verify (media-plan + media-platform conformance) → supervised (campaign placement always human; campaign intake is the ONLY auto-eligible op, no direct capital risk) |
@@ -481,12 +481,36 @@ knowing before reading a verdict:
   never a quiet yes.
 
 Every entry's `:transcription-notes` states what it does **not**
-capture. Most importantly, all four platforms keep open-ended reserve
-clauses (Google's 「その他の制限付きビジネス」, Microsoft's "Areas of
+capture. Most importantly, every platform keeps an open-ended reserve
+clause (Google's 「その他の制限付きビジネス」, Microsoft's "Areas of
 Questionable Legality" / "Other Market Restricted Products and
-Services") which are not enumerable — so **a clean verdict from this
-catalog is a necessary, not a sufficient, condition for platform
+Services", Telegram's closing "All examples on this page are
+non-exhaustive") which is not enumerable — so **a clean verdict from
+this catalog is a necessary, not a sufficient, condition for platform
 approval.**
+
+Two entries are not simply "read and transcribed", and say so in data
+rather than only in prose:
+
+- **`line-yahoo-ads` carries `:policy-read :partial`.** LINEヤフー's
+  enumerated 掲載基準 renders via JavaScript and served a loading error
+  to every fetch, so only the operator's published change document was
+  read. Under the open-set rule the entry would have resolved every
+  unread category to `:permitted` — waving through precisely what
+  nobody read. Instead an unnamed category resolves `:not-transcribed`
+  and the governor **holds**, with a detail that says *we did not read
+  this*, not *the platform refused it*. Reading the rest is the
+  extension task; relaxing the flag is not.
+- **`youtube-ads` carries `:categories-incorporated-from "google-ads"`.**
+  YouTube's own overview states it — *"To place ads on YouTube, you'll
+  have to comply with: Google Ad Policies"* — so its categories **and
+  the restricted-category country rule** resolve through `google-ads`
+  rather than being copied into a second table that can drift. Its own
+  two additions (mimicking YouTube site elements, user-generated
+  content in ads) are recorded as attestations, and YouTube Kids, whose
+  policy has not been read, is an excluded placement context rather
+  than silently servable. "We support Google Ads" does not answer "can
+  we run this on YouTube?" — this entry is what answers it.
 
 Adding a platform is additive and cheap — read that platform's own
 published policy, transcribe its taxonomy, record the URL, the version
