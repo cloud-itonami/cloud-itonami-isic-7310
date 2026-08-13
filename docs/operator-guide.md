@@ -59,6 +59,53 @@ Note also that all four platforms keep open-ended reserve clauses (Google's
 **a clean verdict from this actor is a necessary and not a sufficient condition
 for platform approval** — the platform's own review still decides.
 
+## Placing a real buy (and the two flags that charge)
+
+`clojure -M:buy` is the only command in this repository that opens a
+socket. It has three modes and you should use them in order:
+
+```bash
+clojure -M:buy --campaign <id>                    # dry run. No socket, no credential needed.
+clojure -M:buy --campaign <id> --live             # real account, campaign created PAUSED. Zero charge.
+clojure -M:buy --campaign <id> --live --spend --max-spend-jpy 50000   # ENABLED. This charges.
+```
+
+**Run the middle one first against any new account.** It exercises your
+credentials, the two-step budget-then-campaign creation and the whole
+governor path, and the only thing it does not do is charge. If it fails,
+the third would have failed *after* taking your client's money. The
+campaign it leaves behind is a real, paused campaign you can inspect in
+the Google Ads UI and delete.
+
+Credentials come from the environment and are never read from this
+repository:
+
+```bash
+export GOOGLE_ADS_DEVELOPER_TOKEN=...   GOOGLE_ADS_ACCESS_TOKEN=...
+export GOOGLE_ADS_CUSTOMER_ID=...       GOOGLE_ADS_LOGIN_CUSTOMER_ID=...
+```
+
+An incomplete set is refused **by name** before anything opens, so a
+missing credential looks like a missing credential rather than an API
+error you have to decode. No credential value is ever written to a
+receipt or the audit ledger.
+
+`--max-spend-jpy` is **your** ceiling, and it is deliberately a second
+number: the campaign's own client-authorized budget is already
+recomputed by the governor, and this one is checked again in the last
+function before the network. Set it to what you are willing to lose if
+the campaign record is wrong, not to the campaign's budget.
+
+Six of the eight catalogued platforms have no buy adapter. A placement
+targeting them still commits its record and its receipt says
+`:unsupported` — this actor can rule on them and cannot buy them.
+
+### What you have to obtain yourself
+
+The Google Ads account, the developer token, the OAuth client and the
+payment method. Those need your company's identity and payment details;
+nothing here can stand in for them.
+
 ## Minimum Production Controls
 
 - spec-basis citation required before any customer-facing determination
