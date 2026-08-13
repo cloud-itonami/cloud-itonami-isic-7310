@@ -330,16 +330,32 @@
          " <span class=\"muted\">(never auto-eligible, at any phase)</span></td>"
          "</tr>")))
 
-(defn- ledger-rows [db]
+(defn- ledger-rows
+  "One row per ledger fact. Most facts are op decisions; a
+  `:placement-dispatch` receipt is not -- it is the statement of
+  whether a committed placement actually reached a media network, and
+  it is rendered as its own row rather than folded into the placement
+  above it. An auditor scanning this table has to be able to see
+  'committed' and 'sent nothing' as two facts, because they are."
+  [db]
   (for [[i fact] (map-indexed vector (store/ledger db))]
-    (let [[dcls dlabel] (disposition-cell fact)]
+    (let [receipt? (= :placement-dispatch (:t fact))
+          [dcls dlabel] (if receipt?
+                          (if (:sent? fact)
+                            ["commit" "SENT"]
+                            ["hold" (str "NOT SENT (" (name (:mode fact)) ")")])
+                          (disposition-cell fact))]
       (str "<tr>"
            "<td>" (inc i) "</td>"
-           "<td><code>" (esc (name (:op fact))) "</code></td>"
-           "<td><code>" (esc (:subject fact)) "</code></td>"
-           "<td>" (esc (:actor fact)) "</td>"
+           "<td><code>" (esc (name (or (:op fact) (:t fact)))) "</code></td>"
+           "<td><code>" (esc (or (:subject fact) (:campaign-id fact))) "</code></td>"
+           "<td>" (esc (or (:actor fact)
+                           (when receipt? (or (:platform fact) "--")))) "</td>"
            "<td class=\"" dcls "\">" (esc dlabel) "</td>"
-           "<td>" (if (seq (:basis fact)) (esc (str/join ", " (map name (:basis fact)))) "<span class=\"muted\">--</span>") "</td>"
+           "<td>" (cond
+                    (seq (:basis fact)) (esc (str/join ", " (map name (:basis fact))))
+                    receipt? (esc (or (:note fact) (:error fact) ""))
+                    :else "<span class=\"muted\">--</span>") "</td>"
            "<td>" (if-let [c (:confidence fact)] (esc c) "<span class=\"muted\">--</span>") "</td>"
            "</tr>"))))
 

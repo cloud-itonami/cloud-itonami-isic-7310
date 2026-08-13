@@ -10,6 +10,13 @@
     - the Store    (MemStore today; Datomic/kotoba-server is the next seam) - `store` arg
     - the Advisor  (mock | real LLM)                                       - :advisor opt
     - the Phase    (0->3 rollout)                                          - :phase in ctx
+    - the Placer   (dry-run | live media buy)                              - :placer opt
+
+  The Placer is the newest of the four and the only one that can spend
+  money, so it is the one whose DEFAULT matters: it is a dry run. An
+  instance that never injects a placer builds every buy request and
+  sends none of them, and every placement commit still writes a receipt
+  saying so -- see the commit node.
 
   One graph run = one advertising operation (intake -> advise ->
   govern -> decide -> commit | hold | approval). No unbounded inner
@@ -25,6 +32,7 @@
             [langgraph.checkpoint :as cp]
             [advertising.advertisingadvisor :as advertisingadvisor]
             [advertising.governor :as governor]
+            [advertising.placer :as placer]
             [advertising.phase :as phase]
             [advertising.store :as store]))
 
@@ -48,10 +56,14 @@
   `advertising.store/Store`).
   opts:
     :advisor      -- an `advertising.advertisingadvisor/Advisor` (default: mock-advisor)
-    :checkpointer -- langgraph checkpointer (default: in-mem)"
-  [store & [{:keys [advisor checkpointer]
+    :checkpointer -- langgraph checkpointer (default: in-mem)
+    :placer       -- an `advertising.placer` placer (default: dry-run).
+                     The default sends nothing; a live placer is an
+                     explicit injection and needs an :http-fn."
+  [store & [{:keys [advisor checkpointer placer]
              :or   {advisor      (advertisingadvisor/mock-advisor)
-                    checkpointer (cp/mem-checkpointer)}}]]
+                    checkpointer (cp/mem-checkpointer)
+                    placer       (placer/dry-run-placer)}}]]
   (-> (g/state-graph
        {:channels
         {:request     {:default nil}
@@ -120,13 +132,31 @@
                                                        [{:rule :approver-rejected}]))
                             {:t :approval-rejected})]})))
 
-      ;; Commit -- the ONLY node that writes the SSoT + audit ledger.
+      ;; Commit -- the ONLY node that writes the SSoT + audit ledger, and
+      ;; the ONLY node that may dispatch a real placement.
+      ;;
+      ;; The dispatch happens HERE and nowhere earlier: by this point the
+      ;; Campaign Governor has cleared the campaign and (for both actuation
+      ;; ops, at every phase) a human has approved it. And it happens on
+      ;; EVERY `:actuation/place-campaign` commit, unconditionally -- the
+      ;; receipt is what stops `:campaign/mark-placed` from appearing in the
+      ;; ledger without saying whether anything was actually bought. A
+      ;; dispatch that sends nothing writes `:sent? false` and says why; it
+      ;; is never omitted, because an absent receipt and a dry-run receipt
+      ;; would read identically to whoever audits this later.
       (g/add-node :commit
         (fn [{:keys [request context proposal record]}]
-          (store/commit-record! store record)
-          (let [f (commit-fact request context proposal)]
+          (let [placement (store/commit-record! store record)
+                f (commit-fact request context proposal)]
             (store/append-ledger! store f)
-            {:audit [f]})))
+            (if (= :actuation/place-campaign (:op request))
+              (let [receipt (placer/place!
+                             placer
+                             {:campaign (store/campaign store (:subject request))
+                              :placement-record (get placement "record")})]
+                (store/append-ledger! store receipt)
+                {:audit [f receipt]})
+              {:audit [f]}))))
 
       ;; Hold -- write the rejection to the ledger; no SSoT mutation.
       (g/add-node :hold
