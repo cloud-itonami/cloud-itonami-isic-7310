@@ -146,14 +146,21 @@
       ;; would read identically to whoever audits this later.
       (g/add-node :commit
         (fn [{:keys [request context proposal record]}]
-          (let [placement (store/commit-record! store record)
-                f (commit-fact request context proposal)]
+          (store/commit-record! store record)
+          (let [f (commit-fact request context proposal)]
             (store/append-ledger! store f)
             (if (= :actuation/place-campaign (:op request))
+              ;; The placement record is read back from the history rather
+              ;; than taken from `commit-record!`'s return value: both
+              ;; backends return the STORE, not the result, and the first
+              ;; version of this node quietly shipped `:placement-number
+              ;; nil` into every receipt because a unit test that passed
+              ;; the record in by hand could not see it. Running the thing
+              ;; is what found it.
               (let [receipt (placer/place!
                              placer
                              {:campaign (store/campaign store (:subject request))
-                              :placement-record (get placement "record")})]
+                              :placement-record (last (store/placement-history store))})]
                 (store/append-ledger! store receipt)
                 {:audit [f receipt]})
               {:audit [f]}))))
