@@ -92,11 +92,38 @@ evidence assessment, media-platform ad-policy conformance,
 misleading-claim-risk screening and campaign placement, plus the
 creator-tie-up lifecycle -- creator-eligibility screening,
 per-jurisdiction tie-up evidence assessment and the tie-up order
-itself. It does **not** integrate with any real ad platform's buying
-API -- it governs the DECISION to place a campaign, not the mechanics
-of placing it, so `:actuation/place-campaign` drafts a placement
-RECORD an agency would keep rather than calling a media network. It
-does **not**, by itself, hold any professional license required to
+itself.
+
+Since 2026-08-13 it has an **actuation seam** (`advertising.placer`),
+built so that acting is the explicitly chosen exception rather than the
+default:
+
+- **The default placer is a dry run.** It builds the platform-shaped
+  buy request and sends nothing. An instance that injects no placer
+  never reaches a network.
+- **A live placer needs an injected `:http-fn` and throws without one.**
+  This repository holds no credential and performs no ambient I/O. A
+  live placer that could only ever behave as a dry run refuses to be
+  constructed, because the operator would otherwise believe money moved.
+- **Only `google-ads` (and therefore `youtube-ads`) has a request
+  builder.** The other six catalogued platforms are policy-only: this
+  actor can rule on them and cannot buy them, and the receipt says
+  `:unsupported` rather than looking like a successful placement.
+- **Every `:actuation/place-campaign` commit writes a RECEIPT to the
+  audit ledger** stating `:mode`, `:sent?` and the platform. That is the
+  point of the seam: before it, the ledger could say
+  `:campaign/mark-placed` without saying whether anything had been
+  bought, and bookkeeping and spending a client's money are not the same
+  event. A dispatch that sends nothing writes `:sent? false` and says
+  why; the receipt is never omitted, because an absent receipt and a
+  dry-run receipt would read identically to whoever audits this later.
+
+The seam sits **downstream of the governor and the human approval** -- a
+held campaign builds no request at all. This actor still governs the
+DECISION to place a campaign, and `:actuation/place-campaign` still
+drafts the placement RECORD an agency keeps; what changed is that the
+audit trail now states, per placement, whether that decision became an
+act. It does **not**, by itself, hold any professional license required to
 operate as an advertising agency in a given jurisdiction, and it does
 not claim to. It also does **not** create the creative work itself, or
 judge the artistic/strategic merit of a campaign --
