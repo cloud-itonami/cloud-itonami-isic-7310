@@ -5,9 +5,12 @@
   without a statement of whether anything was sent.** Everything else
   here exists to make that statement impossible to fake -- the default
   sends nothing, a live placer that could not send refuses to exist, a
-  platform with no adapter says so rather than looking successful, and
-  a failed send is `:sent? false` rather than an omission."
-  (:require [clojure.test :refer [deftest is testing]]
+  platform with no adapter says so rather than looking successful, a
+  failed send is `:sent? false` rather than an omission, and CHARGING a
+  client is a second decision on top of going live, with its own
+  operator-set ceiling checked in the last function before the network."
+  (:require [clojure.string :as str]
+            [clojure.test :refer [deftest is testing]]
             [langgraph.graph :as g]
             [advertising.placer :as placer]
             [advertising.store :as store]
@@ -19,51 +22,169 @@
 
 (def ^:private placement-record {"record_id" "JPN-PLC-000000"})
 
-(deftest the-default-builds-the-request-and-sends-nothing
+(def ^:private creds
+  {:developer-token "dev-tok" :access-token "acc-tok"
+   :customer-id "5551234567" :login-customer-id "9998887777"})
+
+(defn- ok-http
+  "An http-fn that answers both steps the way the real API does, and
+  records what it was asked."
+  [sent]
+  (fn [req]
+    (swap! sent conj req)
+    (if (str/includes? (:url req) "campaignBudgets")
+      {:status 200 :body {"results" [{"resourceName" "customers/5551234567/campaignBudgets/77"}]}}
+      {:status 200 :body {"results" [{"resourceName" "customers/5551234567/campaigns/88"}]}})))
+
+;; ----------------------------- credentials -----------------------------
+
+(deftest a-partial-credential-set-is-reported-as-missing-names-not-a-partial-map
+  (testing "three of four credentials would fail at the API with an error the operator has to decode; a list of names says what to go and get"
+    (let [env {"GOOGLE_ADS_DEVELOPER_TOKEN" "d" "GOOGLE_ADS_ACCESS_TOKEN" "a"}]
+      (is (= {:missing ["GOOGLE_ADS_CUSTOMER_ID" "GOOGLE_ADS_LOGIN_CUSTOMER_ID"]}
+             (placer/credentials-from-env env)))))
+  (testing "blank and whitespace-only values are missing, not present -- an empty env var is the commonest way a credential is 'set'"
+    (let [env {"GOOGLE_ADS_DEVELOPER_TOKEN" "d" "GOOGLE_ADS_ACCESS_TOKEN" "  "
+               "GOOGLE_ADS_CUSTOMER_ID" "" "GOOGLE_ADS_LOGIN_CUSTOMER_ID" "l"}]
+      (is (= {:missing ["GOOGLE_ADS_ACCESS_TOKEN" "GOOGLE_ADS_CUSTOMER_ID"]}
+             (placer/credentials-from-env env)))))
+  (testing "a complete set comes back keyed for the builder"
+    (is (= {:ok creds}
+           (placer/credentials-from-env {"GOOGLE_ADS_DEVELOPER_TOKEN" "dev-tok"
+                                         "GOOGLE_ADS_ACCESS_TOKEN" "acc-tok"
+                                         "GOOGLE_ADS_CUSTOMER_ID" "5551234567"
+                                         "GOOGLE_ADS_LOGIN_CUSTOMER_ID" "9998887777"})))))
+
+;; ----------------------------- dry run -----------------------------
+
+(deftest the-default-builds-both-requests-and-sends-nothing
   (let [r (placer/place! (placer/dry-run-placer)
                          {:campaign campaign :placement-record placement-record})]
     (is (= :dry-run (:mode r)))
     (is (false? (:sent? r)))
+    (is (false? (:spend? r)))
     (is (= "google-ads" (:platform r)))
     (is (= "JPN-PLC-000000" (:placement-number r)))
-    (testing "a dry run is not a stub -- the receipt carries the request that WOULD go out, so it can be reviewed and diffed"
-      (is (= :post (get-in r [:request :method])))
-      (is (re-find #"googleads\.googleapis\.com" (get-in r [:request :url])))
-      (is (= 500000000000 (get-in r [:request :body "operations" 0 "create" "campaignBudget" "amountMicros"])))
-      (is (= "JPN-PLC-000000" (get-in r [:request :body "agencyPlacementRecord"]))))))
+    (testing "a real campaign creation is TWO requests -- the budget resource, then the campaign that references it. One request was not a simplification, it was wrong"
+      (is (= 2 (count (:requests r))))
+      (is (= [:campaign-budget :campaign] (mapv :step (:requests r))))
+      (is (re-find #"/v18/customers/.*/campaignBudgets:mutate" (:url (first (:requests r)))))
+      (is (re-find #"/v18/customers/.*/campaigns:mutate" (:url (second (:requests r))))))
+    (testing "and the default status is PAUSED, which is a real campaign that charges nothing"
+      (is (= "PAUSED" (:campaign-status r)))
+      (is (= "PAUSED" (get-in (second (:requests r)) [:body "operations" 0 "create" "status"]))))
+    (testing "the dry run does not pretend to know the budget id it cannot know"
+      (is (re-find #"from step 1"
+                   (get-in (second (:requests r)) [:body "operations" 0 "create" "campaignBudget"]))))))
+
+(deftest a-receipt-never-carries-a-credential-value
+  (testing "the ledger is an audit trail, not a secret store -- and this is the function that decides what lands in it"
+    (let [sent (atom [])
+          p (placer/live-placer {:http-fn (ok-http sent) :credentials creds})
+          r (placer/place! p {:campaign campaign :placement-record placement-record})
+          receipt-text (pr-str r)]
+      (is (true? (:sent? r)))
+      (doseq [secret ["dev-tok" "acc-tok"]]
+        (is (not (str/includes? receipt-text secret))
+            (str secret " must not appear anywhere in the receipt")))
+      (testing "while the requests that ACTUALLY went out did carry them"
+        (is (= "Bearer acc-tok" (get-in (first @sent) [:headers "Authorization"])))
+        (is (= "dev-tok" (get-in (first @sent) [:headers "developer-token"])))))))
+
+;; ----------------------------- refusing to exist -----------------------------
 
 (deftest a-live-placer-that-cannot-send-refuses-to-exist
-  (testing "constructing it without an :http-fn throws, rather than yielding something that behaves as a dry run"
-    (is (thrown? clojure.lang.ExceptionInfo (placer/live-placer {})))
-    (is (thrown? clojure.lang.ExceptionInfo (placer/live-placer {:http-fn "not-a-fn"})))
-    (is (thrown? clojure.lang.ExceptionInfo (placer/live-placer {:customer-id "123"}))))
-  (testing "the failure has to happen at CONSTRUCTION: a placer that failed silently at dispatch would write :sent? false onto a placement the operator believes they authorised for real"
-    (try (placer/live-placer {})
+  (testing "no :http-fn -- throws at CONSTRUCTION rather than yielding something that behaves as a dry run"
+    (is (thrown? clojure.lang.ExceptionInfo (placer/live-placer {:credentials creds})))
+    (is (thrown? clojure.lang.ExceptionInfo (placer/live-placer {:http-fn "not-a-fn" :credentials creds}))))
+  (testing "an INCOMPLETE credential set is refused too, for the same reason a partial map is never returned"
+    (doseq [k [:developer-token :access-token :customer-id :login-customer-id]]
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (placer/live-placer {:http-fn identity :credentials (dissoc creds k)}))
+          (str "missing " k " must fail at construction"))))
+  (testing "a SPENDING placer with no ceiling of its own is refused -- the campaign's authorized budget is the governor's number, not the operator's"
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (placer/live-placer {:http-fn identity :credentials creds :spend? true})))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (placer/live-placer {:http-fn identity :credentials creds :spend? true
+                                      :max-spend-micros 0}))))
+  (testing "the messages name what to fix"
+    (try (placer/live-placer {:credentials creds})
          (is false "should have thrown")
-         (catch clojure.lang.ExceptionInfo e
-           (is (re-find #"http-fn" (ex-message e)))))))
+         (catch clojure.lang.ExceptionInfo e (is (re-find #"http-fn" (ex-message e)))))
+    (try (placer/live-placer {:http-fn identity :credentials (dissoc creds :customer-id)})
+         (is false "should have thrown")
+         (catch clojure.lang.ExceptionInfo e (is (re-find #"customer-id" (ex-message e)))))))
 
-(deftest a-live-placer-sends-through-the-injected-fn-and-records-the-response
+;; ----------------------------- live, and spending -----------------------------
+
+(deftest going-live-is-not-the-same-decision-as-spending
+  (testing "a live placer without :spend? creates a REAL campaign on a REAL account, PAUSED -- everything real except the charge"
+    (let [sent (atom [])
+          p (placer/live-placer {:http-fn (ok-http sent) :credentials creds})
+          r (placer/place! p {:campaign campaign :placement-record placement-record})]
+      (is (true? (:sent? r)))
+      (is (false? (:spend? r)))
+      (is (= "PAUSED" (:campaign-status r)))
+      (is (= "PAUSED" (get-in (second @sent) [:body "operations" 0 "create" "status"])))))
+  (testing "only :spend? true creates it ENABLED, which is the state that can charge"
+    (let [sent (atom [])
+          p (placer/live-placer {:http-fn (ok-http sent) :credentials creds
+                                 :spend? true :max-spend-micros 1000000000000})
+          r (placer/place! p {:campaign campaign :placement-record placement-record})]
+      (is (true? (:sent? r)))
+      (is (true? (:spend? r)))
+      (is (= "ENABLED" (:campaign-status r)))
+      (is (= "ENABLED" (get-in (second @sent) [:body "operations" 0 "create" "status"]))))))
+
+(deftest the-two-step-creation-threads-the-real-budget-id
   (let [sent (atom [])
-        p (placer/live-placer {:http-fn (fn [req] (swap! sent conj req) {:status 200 :id "cmp-9"})
-                               :customer-id "555"})
+        p (placer/live-placer {:http-fn (ok-http sent) :credentials creds})
         r (placer/place! p {:campaign campaign :placement-record placement-record})]
-    (is (= :live (:mode r)))
-    (is (true? (:sent? r)))
-    (is (= {:status 200 :id "cmp-9"} (:response r)))
-    (is (= 1 (count @sent)))
-    (is (re-find #"/customers/555/" (:url (first @sent)))
-        "injected opts reach the request builder, so a dry run and a live send build the SAME shape"))
+    (is (= 2 (count @sent)))
+    (is (= "customers/5551234567/campaignBudgets/77"
+           (get-in (second @sent) [:body "operations" 0 "create" "campaignBudget"]))
+        "the campaign request references the budget the API actually returned")
+    (is (= 2 (count (:responses r))) "and both responses are kept on the receipt")
+    (is (not (re-find #"from step 1" (pr-str (:requests r))))
+        "the receipt shows the resolved request, not the placeholder")))
+
+(deftest a-budget-step-that-returns-no-resource-name-refuses-to-guess
+  (testing "the second request cannot be built without the first's answer, and a guessed budget id would attach a campaign to the wrong money"
+    (let [p (placer/live-placer {:http-fn (fn [_] {:status 200 :body {}}) :credentials creds})
+          r (placer/place! p {:campaign campaign :placement-record placement-record})]
+      (is (false? (:sent? r)))
+      (is (re-find #"refusing to guess" (:error r))))))
+
+(deftest the-operator-ceiling-is-checked-in-the-last-function-before-the-network
+  (testing "a campaign whose own record is internally consistent is still stopped by the operator's own number"
+    (let [sent (atom [])
+          p (placer/live-placer {:http-fn (ok-http sent) :credentials creds
+                                 :spend? true :max-spend-micros 100000})
+          r (placer/place! p {:campaign campaign :placement-record placement-record})]
+      (is (false? (:sent? r)))
+      (is (= [] @sent) "nothing reached the network")
+      (is (re-find #"spend ceiling exceeded" (:error r)))
+      (is (re-find #"500000000000" (:error r)) "the receipt states both numbers")))
+  (testing "the ceiling is a SPENDING concept: a PAUSED live run is not stopped by it, because a paused campaign charges nothing"
+    (let [sent (atom [])
+          p (placer/live-placer {:http-fn (ok-http sent) :credentials creds})
+          r (placer/place! p {:campaign campaign :placement-record placement-record})]
+      (is (true? (:sent? r)))
+      (is (= 2 (count @sent)))))
   (testing "a send that throws is reported as NOT sent, with the error -- never as a success and never as an omission"
-    (let [p (placer/live-placer {:http-fn (fn [_] (throw (ex-info "402 payment required" {})))})
+    (let [p (placer/live-placer {:http-fn (fn [_] (throw (ex-info "402 payment required" {})))
+                                 :credentials creds})
           r (placer/place! p {:campaign campaign :placement-record placement-record})]
       (is (= :live (:mode r)))
       (is (false? (:sent? r)))
       (is (re-find #"402" (:error r)))
-      (is (some? (:request r)) "the request that failed is kept, because that is what an operator retries"))))
+      (is (seq (:requests r)) "the requests that failed are kept, because that is what an operator retries"))))
+
+;; ----------------------------- unsupported platforms -----------------------------
 
 (deftest a-platform-this-actor-can-rule-on-but-cannot-buy-says-so
-  (testing "seven of the eight catalogued platforms have a transcribed POLICY and no buy adapter, and the receipt is how that stays visible"
+  (testing "six of the eight catalogued platforms have a transcribed POLICY and no buy adapter, and the receipt is how that stays visible"
     (doseq [pid ["chatgpt-ads" "meta-ads" "microsoft-advertising" "x-ads"
                  "telegram-ads" "line-yahoo-ads"]]
       (is (false? (placer/supported? pid)))
@@ -109,7 +230,12 @@
       (is (false? (:sent? (first rs)))
           "with the DEFAULT placer, nothing was sent -- and the ledger says so rather than being silent")
       (is (= :dry-run (:mode (first rs))))
-      (is (= "campaign-10" (:campaign-id (first rs))))))
+      (is (= "campaign-10" (:campaign-id (first rs))))
+      (testing "and the receipt is tied to the placement record the store actually wrote -- a receipt that cannot name its placement cannot be reconciled against the agency's book of record"
+        (is (= "JPN-PLC-000000" (:placement-number (first rs))))
+        (is (re-find #"JPN-PLC-000000"
+                     (get-in (first rs) [:requests 0 :body "operations" 0 "create" "name"]))
+            "and the budget the buy request names carries it too"))))
   (testing "a campaign bought on a platform with no adapter ALSO gets a receipt, and it is the receipt that keeps 'we recorded a placement' from reading as 'we bought an ad'"
     (let [db (store/seed-db)
           rs (receipts (placed-through db (op/build db) "campaign-1"))]
@@ -121,17 +247,16 @@
 (deftest an-injected-live-placer-is-what-makes-a-real-buy-happen
   (let [db (store/seed-db)
         sent (atom [])
-        actor (op/build db {:placer (placer/live-placer
-                                     {:http-fn (fn [req] (swap! sent conj req) {:status 200})})})
+        actor (op/build db {:placer (placer/live-placer {:http-fn (ok-http sent) :credentials creds})})
         rs (receipts (placed-through db actor "campaign-10"))]
-    (is (= 1 (count @sent)) "the buy request left through the injected fn, and only once")
+    (is (= 2 (count @sent)) "both requests left through the injected fn")
     (is (true? (:sent? (first rs))))
-    (is (= :live (:mode (first rs)))))
+    (is (= :live (:mode (first rs))))
+    (is (false? (:spend? (first rs))) "and still did not charge, because :spend? was not asked for"))
   (testing "and injecting a live placer does NOT make an unsupported platform buyable -- the adapter, not the mode, decides whether a request exists"
     (let [db (store/seed-db)
           sent (atom [])
-          actor (op/build db {:placer (placer/live-placer
-                                       {:http-fn (fn [req] (swap! sent conj req) {:status 200})})})
+          actor (op/build db {:placer (placer/live-placer {:http-fn (ok-http sent) :credentials creds})})
           rs (receipts (placed-through db actor "campaign-1"))]
       (is (= [] @sent))
       (is (= :unsupported (:mode (first rs)))))))
@@ -141,7 +266,8 @@
     (let [db (store/seed-db)
           sent (atom [])
           actor (op/build db {:placer (placer/live-placer
-                                       {:http-fn (fn [req] (swap! sent conj req) {:status 200})})})]
+                                       {:http-fn (ok-http sent) :credentials creds
+                                        :spend? true :max-spend-micros 1000000000000})})]
       (g/run* actor {:request {:op :actuation/place-campaign :subject "campaign-3"}
                      :context {:actor-id "op-1" :actor-role :agency-operator :phase 3}}
               {:thread-id "pl-h"})

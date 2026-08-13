@@ -118,6 +118,41 @@ default:
   why; the receipt is never omitted, because an absent receipt and a
   dry-run receipt would read identically to whoever audits this later.
 
+**Going live and SPENDING are two decisions.** A Google Ads campaign
+created through the API with `status: PAUSED` is a real campaign object
+on a real account and charges nothing; only `ENABLED` charges. So a live
+placer creates campaigns PAUSED unless `:spend? true` is also given, and
+a spending placer additionally requires `:max-spend-micros` -- an
+operator-set ceiling, independent of the campaign's own client-authorized
+budget that the governor already recomputes, checked in the last function
+before the network. Two ceilings from two sources, because the failure
+this guards against is a campaign record that is internally consistent
+and wrong.
+
+The operator entry point is `clojure -M:buy`, the only file in this
+repository that opens a socket:
+
+```bash
+clojure -M:buy --campaign campaign-10                      # dry run, no socket, no credential
+clojure -M:buy --campaign campaign-10 --live               # real account, campaign PAUSED, zero charge
+clojure -M:buy --campaign campaign-10 --live --spend --max-spend-jpy 50000   # ENABLED: this charges
+```
+
+Run the middle one first against any new account. It exercises the
+credentials, the two-step budget-then-campaign creation and the governor
+path end to end, and the only thing it does not do is charge; if it
+fails, the third would have failed after taking the client's money.
+Credentials are read from `GOOGLE_ADS_DEVELOPER_TOKEN`,
+`GOOGLE_ADS_ACCESS_TOKEN`, `GOOGLE_ADS_CUSTOMER_ID` and
+`GOOGLE_ADS_LOGIN_CUSTOMER_ID`; an incomplete set is refused **by name**
+before anything is opened, and no credential value ever reaches a
+receipt or the ledger.
+
+**What this repository still cannot do for you:** create the Google Ads
+account, apply for the developer token, complete OAuth, or attach a
+payment method. Those need a human with the company's identity and
+payment details.
+
 The seam sits **downstream of the governor and the human approval** -- a
 held campaign builds no request at all. This actor still governs the
 DECISION to place a campaign, and `:actuation/place-campaign` still
