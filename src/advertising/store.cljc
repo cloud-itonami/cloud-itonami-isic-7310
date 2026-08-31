@@ -77,7 +77,14 @@
    :attestations {:distinguishable-from-product-ui true
                   :landing-page-consistency true
                   :advertiser-identity-verified true
-                  :editorial-standards true}
+                  :editorial-standards true
+                  ;; exoclick-ads' two: the minors floor and the refusal of the
+                  ;; deepfake/undressing product category. Base, for the reason
+                  ;; stated above -- campaign-16 exists to be held by a CATEGORY,
+                  ;; and would be unreadable as a demo if it were also held by a
+                  ;; missing attestation it never meant to test.
+                  :no-minors-depicted true
+                  :no-synthetic-likeness-claim true}
    :requested-placement-contexts []})
 
 (def ^:private clean-tieup-facts
@@ -246,6 +253,44 @@
                  :target-platform "youtube-ads"
                  :ad-category :gambling
                  :proposed-media-spend 500000 :authorized-budget 800000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+
+    ;; ---- adult-traffic network (ExoClick), murakumo.cloud ----
+    ;; The profile these two exist for: murakumo.cloud sells image and video
+    ;; GENERATION, and wants to buy adult traffic. The product is identical in
+    ;; both records. Only the DECLARED CATEGORY differs, and that single field
+    ;; is the whole difference between a placeable campaign and one the network
+    ;; refuses -- which is precisely the fact an operator needs surfaced before
+    ;; writing creative, not after ExoClick rejects it.
+    ;;
+    ;; NOTE the spend figures are demo values. A campaign record is not a budget
+    ;; authorization: nothing here has been approved, and this actor cannot
+    ;; attach a payment method (CLAUDE.md safety floor 2).
+    ;;
+    ;; clean: sold as what it is -- a generation service. :digital-products-
+    ;; education is unnamed by ExoClick's guidelines, and ExoClick is an OPEN
+    ;; set, so it resolves :permitted.
+    "campaign-15" (merge clean-platform-facts
+                 {:id "campaign-15" :client-name "murakumo.cloud"
+                 :target-platform "exoclick-ads"
+                 :ad-category :digital-products-education
+                 :proposed-media-spend 100000 :authorized-budget 300000
+                 :misleading-claim-risk-unresolved? false
+                 :campaign-placed? false
+                 :jurisdiction "JPN" :status :intake})
+    ;; the SAME product, positioned as a faceswap/undressing tool. ExoClick's
+    ;; guidelines refuse that product category outright ("Deepfake/Faceswap/
+    ;; Undressing apps not accepted"), so this HARD holds -- on the adult
+    ;; network, while every mainstream platform in this catalog would have
+    ;; waved it through by never naming it. That inversion is the reason
+    ;; :synthetic-likeness-manipulation was added to the vocabulary.
+    "campaign-16" (merge clean-platform-facts
+                 {:id "campaign-16" :client-name "murakumo.cloud"
+                 :target-platform "exoclick-ads"
+                 :ad-category :synthetic-likeness-manipulation
+                 :proposed-media-spend 100000 :authorized-budget 300000
                  :misleading-claim-risk-unresolved? false
                  :campaign-placed? false
                  :jurisdiction "JPN" :status :intake})

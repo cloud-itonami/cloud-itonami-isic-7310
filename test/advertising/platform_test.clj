@@ -79,6 +79,7 @@
 
 (deftest cross-platform-disposition-answers-where-can-this-run
   (is (= {"chatgpt-ads" :not-permitted
+          "exoclick-ads" :permitted
           "google-ads" :permitted
           "line-yahoo-ads" :not-transcribed
           "meta-ads" :restricted
@@ -87,9 +88,10 @@
           "x-ads" :permitted
           "youtube-ads" :permitted}
          (into {} (platform/cross-platform-disposition :beauty-cosmetics)))
-      "one question, eight answers -- and the three kinds of 'no' stay distinguishable")
+      "one question, nine answers -- and the three kinds of 'no' stay distinguishable")
   (testing "a category the OPEN sets do not name resolves permitted there, and is held on the CLOSED one"
     (is (= {"chatgpt-ads" :not-permitted
+            "exoclick-ads" :permitted
             "google-ads" :permitted
             "line-yahoo-ads" :prohibited
             "meta-ads" :permitted
@@ -322,3 +324,23 @@
     (is (seq cl))
     (is (some #(str/includes? % "distinguishable-from-product-ui") cl))
     (is (some #(str/includes? % "ChatGPT Ads") cl))))
+
+(deftest only-the-adult-network-names-synthetic-likeness-manipulation
+  (testing "the gap this entry closes: a deepfake/undressing app is REFUSED by the
+            adult network and waved through by the mainstream ones, which is the
+            opposite of the ordering an agency would assume"
+    (is (= :prohibited
+           (platform/category-disposition "exoclick-ads" :synthetic-likeness-manipulation))
+        "ExoClick's guidelines say 'Deepfake/Faceswap/Undressing apps not accepted' flatly")
+    (is (= #{:permitted}
+           (set (for [pid ["google-ads" "meta-ads" "x-ads" "telegram-ads" "youtube-ads"]]
+                  (platform/category-disposition pid :synthetic-likeness-manipulation))))
+        "not one mainstream open-set platform NAMES it, so each resolves :permitted --
+         absence of a rule is not a rule, and that is exactly why the category had to
+         be added to the vocabulary rather than left unsayable"))
+  (testing "the exception clause the crypto line carries and the deepfake line does not"
+    (is (= :restricted (platform/category-disposition "exoclick-ads" :cryptocurrency))
+        "'not permitted (subject to exception)' is prohibited-unless-pre-approved, which
+         this model calls :restricted")
+    (is (= :prohibited (platform/category-disposition "exoclick-ads" :synthetic-likeness-manipulation))
+        "the deepfake sentence carries no such clause, so it must not soften to :restricted")))
