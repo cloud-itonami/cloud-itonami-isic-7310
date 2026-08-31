@@ -139,7 +139,7 @@
     ;; harm & deception
     :fraud-deception :malware-phishing :hacking-services
     :traffic-inflation :forged-documents :misinformation
-    :vaccine-discouragement
+    :vaccine-discouragement :synthetic-likeness-manipulation
     ;; dangerous goods
     :weapons :explosives :surveillance-equipment
     ;; violence & exploitation
@@ -706,7 +706,112 @@
          "5) 第2章(3)/第8章(2) forbid creatives that imitate LINEヤフー service design, "
          "which is the same distinguishability duty ChatGPT states for a generative "
          "surface, arrived at from the opposite direction -- a feed that looks like the "
-         "messenger around it.")}})
+         "messenger around it.")}
+
+   ;; ------------------------------------------------------------------
+   ;; The first ADULT-TRAFFIC network in this catalog. It is here because
+   ;; the eight mainstream entries above cannot answer for it: every one
+   ;; of them prohibits or restricts :adult-sexual outright, so an agency
+   ;; reading only them would conclude that adult traffic is unbuyable,
+   ;; when in fact it is a large legitimate market with its OWN published
+   ;; standard -- one that is SHARPER than the mainstream policies in
+   ;; places they say nothing at all about (see :synthetic-likeness-
+   ;; manipulation below, which no other entry in this catalog names).
+   "exoclick-ads"
+   {:name "ExoClick"
+    :operator "EXOCLICK, S.L."
+    :policy-basis "ExoClick Advertising Guidelines"
+    :policy-version "guidelines page, read 2026-08-31 (document states no version number; the Terms & Conditions it sits beside state \"Effective on 3 March 2026\")"
+    :provenance "https://www.exoclick.com/guidelines/"
+    :provenance-secondary "https://www.exoclick.com/terms-conditions/"
+    :read-on "2026-08-31"
+    :generative-surface? false
+    :closed-category-set? false
+    :policy-read :index-complete
+    :permitted-categories #{}
+    :restricted-categories #{:adult-sexual
+                             :nudity-suggestive
+                             :dating
+                             :cryptocurrency
+                             :gambling}
+    :restricted-category-jurisdictions :per-category-unenumerated
+    :prohibited-categories #{:synthetic-likeness-manipulation
+                             :malware-phishing
+                             :fraud-deception
+                             :alcohol
+                             :tobacco
+                             :recreational-drugs
+                             :drug-paraphernalia
+                             :religious-content
+                             :political
+                             :explicit-violence
+                             :hate-harassment
+                             :human-exploitation
+                             :forged-documents
+                             :trademark
+                             :copyrighted-content
+                             :piracy
+                             :weapons
+                             :traffic-inflation}
+    :excluded-placement-contexts #{}
+    :required-attestations #{:advertiser-identity-verified
+                             :landing-page-consistency
+                             :no-minors-depicted
+                             :no-synthetic-likeness-claim}
+    :jurisdiction-attestations {"SWE" #{:no-live-cam-or-custom-video-promotion}}
+    :transcription-notes
+    (str "Transcribed from the Guidelines page end to end, with the Terms & "
+         "Conditions read as :provenance-secondary for the clauses the Guidelines "
+         "do not carry. "
+         "1) THE SHARPEST LINE, and the reason this entry earns its place: "
+         "\"Deepfake/Faceswap/Undressing apps not accepted\" is a flat refusal of a "
+         "PRODUCT CATEGORY, transcribed as :synthetic-likeness-manipulation. No "
+         "mainstream entry in this catalog names it, so before this entry existed "
+         "the vocabulary had no way to say it and a generative-media advertiser "
+         "would have resolved :permitted here under the open-set rule. It is "
+         "prohibited, not restricted: the sentence carries no exception clause, "
+         "unlike the crypto one directly above it. "
+         "2) :cryptocurrency is \"not permitted (subject to exception)\" -- the "
+         "document prohibits and then names a carve-out it does not enumerate. "
+         "Prohibited-unless-pre-approved IS :restricted in this model, so that is "
+         "where it sits; reading it as :prohibited would refuse campaigns the "
+         "operator itself says it may accept. "
+         "3) :adult-sexual and :nudity-suggestive are :restricted rather than "
+         ":permitted even though this is an adult network, because the policy "
+         "governs them by CONDITION rather than by permission: nudity is not "
+         "servable on Mainstream-categorised zones, provocative creative belongs "
+         "to the separate SEXY categorisation, and 900x250 fake dating galleries "
+         "require the faces blurred. A category that is servable only under stated "
+         "conditions is the definition of :restricted here. "
+         "4) :restricted-category-jurisdictions is the :per-category-unenumerated "
+         "sentinel and therefore HOLDS everywhere -- deliberately. The one country "
+         "rule the document does state is Sweden (adult live cam shows and custom "
+         "videos may not be promoted to Swedish audiences under the Sex Purchase "
+         "Act), carried as a :jurisdiction-attestations entry; the per-country "
+         "tables behind the platform's geo-targeting were NOT read. Reading them "
+         "is the extension task, exactly as for line-yahoo-ads. "
+         "5) The Terms add prohibitions the Guidelines page does not repeat: "
+         "paraphilia/scatological material, illegal products or services, incentive "
+         "traffic (:traffic-inflation), hate speech, paper mills and fake documents "
+         "(:forged-documents), unauthorised trademark use, weapons, and profiting "
+         "from human tragedy. Gambling is pre-approval + a minimum monthly budget + "
+         "US-registration geo-blocking, which is why it is :restricted and not "
+         "servable on the strength of this entry alone. "
+         "6) The absolute floor -- \"material that contains children or minors in "
+         "adult or sexual situations\" -- is NOT modelled as a category, because a "
+         "category is what a campaign is FOR and no campaign may be for that. It is "
+         "a required attestation (:no-minors-depicted) so that it is asserted per "
+         "campaign rather than resolved per category. "
+         "7) NOT captured: the ad-FORMAT rules (banner rotation no faster than one "
+         "change per 2 seconds, in-stream video 10-30s, no sound without user "
+         "interaction, no popunder auto-redirect to app stores) and the landing-page "
+         "content requirement. Those are properties of a creative, checked at "
+         "creative review, which this table deliberately does not model. "
+         "8) The Guidelines state NOTHING about AI-generated content beyond item 1, "
+         "and the Terms state nothing at all about it, about model release or about "
+         "age verification. Absence is recorded here as absence -- an entry that "
+         "invented an AI-content clause would be asserting a policy nobody "
+         "published.")}})
 
 (defn policy-basis
   "The platform's policy map, or nil -- nil means NO policy-basis, and

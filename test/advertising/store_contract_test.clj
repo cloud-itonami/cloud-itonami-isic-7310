@@ -23,7 +23,7 @@
       (is (true? (:misleading-claim-risk-unresolved? (store/campaign s "campaign-4"))))
       (is (false? (:campaign-placed? (store/campaign s "campaign-1"))))
       (is (= ["campaign-1" "campaign-10" "campaign-11" "campaign-12" "campaign-13"
-              "campaign-14" "campaign-2"
+              "campaign-14" "campaign-15" "campaign-16" "campaign-2"
               "campaign-21" "campaign-22" "campaign-23" "campaign-24" "campaign-25"
               "campaign-3" "campaign-4" "campaign-5" "campaign-6" "campaign-7"
               "campaign-8" "campaign-9"]
@@ -36,7 +36,9 @@
         (is (= {:distinguishable-from-product-ui true
                 :landing-page-consistency true
                 :advertiser-identity-verified true
-                :editorial-standards true}
+                :editorial-standards true
+                :no-minors-depicted true
+                :no-synthetic-likeness-claim true}
                (:attestations (store/campaign s "campaign-1")))
             "compound attestation map survives the EDN-blob codec")
         (is (= "google-ads" (:target-platform (store/campaign s "campaign-10"))))
