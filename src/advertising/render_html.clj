@@ -6,7 +6,7 @@
   `advertising.sim` (real seed ids/ops -- see that ns for the narrative).
   No invented numbers, no timestamps, byte-identical across reruns."
   (:require [jp-go-dds.skin]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [advertising.store :as store]
             [advertising.operation :as op]
             [advertising.phase :as phase]

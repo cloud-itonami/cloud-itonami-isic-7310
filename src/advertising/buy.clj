@@ -34,7 +34,7 @@
   token, complete OAuth, or attach a payment method. Those need a human
   with the company's identity and payment details, and no agent may
   stand in for that."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [advertising.operation :as op]
             [advertising.placer :as placer]
             [advertising.store :as store])
@@ -65,7 +65,7 @@
   [{:keys [method url headers body]}]
   (let [req (-> (HttpRequest/newBuilder (URI/create url))
                 (as-> b (reduce (fn [acc [k v]] (.header acc k v)) b headers))
-                (.method (str/upper-case (name method))
+                (.method (str/upper (name method))
                          (HttpRequest$BodyPublishers/ofString (json-str body)))
                 (.build))
         resp (.send (HttpClient/newHttpClient) req (HttpResponse$BodyHandlers/ofString))]
