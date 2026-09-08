@@ -9,7 +9,7 @@
   failed send is `:sent? false` rather than an omission, and CHARGING a
   client is a second decision on top of going live, with its own
   operator-set ceiling checked in the last function before the network."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [clojure.test :refer [deftest is testing]]
             [langgraph.graph :as g]
             [advertising.placer :as placer]

@@ -45,7 +45,7 @@
   `advertising.operation`'s `:actuation/place-campaign` and
   `:actuation/order-creator-tieup`, both always human-gated -- see
   README `Actuation`)."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 (defn- unsigned-certificate
   "Every certificate this actor produces is UNSIGNED -- signature is
@@ -165,7 +165,7 @@
      (throw (ex-info "campaign-placement: jurisdiction required" {})))
    (when (< sequence 0)
      (throw (ex-info "campaign-placement: sequence must be >= 0" {})))
-   (let [placement-number (str (str/upper-case jurisdiction) "-PLC-" (zero-pad sequence 6))
+   (let [placement-number (str (str/upper jurisdiction) "-PLC-" (zero-pad sequence 6))
          record (cond-> {"record_id" placement-number
                          "kind" "campaign-placement-draft"
                          "campaign_id" campaign-id
@@ -204,7 +204,7 @@
     (throw (ex-info "creator-tieup-order: creator_handle required" {})))
   (when (< sequence 0)
     (throw (ex-info "creator-tieup-order: sequence must be >= 0" {})))
-  (let [order-number (str (str/upper-case jurisdiction) "-TIE-" (zero-pad sequence 6))
+  (let [order-number (str (str/upper jurisdiction) "-TIE-" (zero-pad sequence 6))
         record {"record_id" order-number
                 "kind" "creator-tieup-order-draft"
                 "campaign_id" campaign-id

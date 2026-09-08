@@ -17,7 +17,7 @@
   assert specific disagreements as transcribed, so a future 'tidy-up'
   that harmonises the taxonomies has to delete a test that says, in
   words, why it must not."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [clojure.test :refer [deftest is testing]]
             [advertising.platform :as platform]))
 

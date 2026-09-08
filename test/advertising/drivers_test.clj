@@ -14,7 +14,7 @@
   rule change could silently turn the demo into a lie while every other
   test stayed green. These tests tie them together."
   (:require [clojure.test :refer [deftest is testing]]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [advertising.sim :as sim]
             [advertising.render-html :as render]
             [advertising.store :as store]))

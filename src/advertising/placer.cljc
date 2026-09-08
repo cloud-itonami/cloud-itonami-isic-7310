@@ -86,7 +86,7 @@
   here is deliberately NOT the same act as adding it to
   `advertising.platform` -- reading a policy is free and safe, wiring a
   buying API spends money."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [advertising.platform :as platform]))
 
 (def google-ads-api-version

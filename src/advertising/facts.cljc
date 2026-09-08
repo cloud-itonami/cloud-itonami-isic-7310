@@ -41,7 +41,7 @@
   authority has itself named?), not a legal opinion that the resulting
   post is compliant. Widening the list is additive and must cite the
   same official source."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 (def catalog
   "iso3 -> requirement map. `:required-evidence` mirrors the generic
