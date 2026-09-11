@@ -1,5 +1,5 @@
 (ns advertising.sim
-  "Demo driver -- `clojure -M:dev:run`. Walks BOTH governed lifecycles
+  "Demo driver -- `kbb -M:dev:run`. Walks BOTH governed lifecycles
   and every rule the Campaign Governor can raise.
 
   Lifecycle 1 (campaign placement): intake -> media-plan verification

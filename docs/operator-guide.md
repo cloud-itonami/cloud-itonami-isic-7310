@@ -61,13 +61,13 @@ for platform approval** — the platform's own review still decides.
 
 ## Placing a real buy (and the two flags that charge)
 
-`clojure -M:buy` is the only command in this repository that opens a
+`kbb -M:buy` is the only command in this repository that opens a
 socket. It has three modes and you should use them in order:
 
 ```bash
-clojure -M:buy --campaign <id>                    # dry run. No socket, no credential needed.
-clojure -M:buy --campaign <id> --live             # real account, campaign created PAUSED. Zero charge.
-clojure -M:buy --campaign <id> --live --spend --max-spend-jpy 50000   # ENABLED. This charges.
+kbb -M:buy --campaign <id>                    # dry run. No socket, no credential needed.
+kbb -M:buy --campaign <id> --live             # real account, campaign created PAUSED. Zero charge.
+kbb -M:buy --campaign <id> --live --spend --max-spend-jpy 50000   # ENABLED. This charges.
 ```
 
 **Run the middle one first against any new account.** It exercises your

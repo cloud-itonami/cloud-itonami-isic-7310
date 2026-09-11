@@ -129,13 +129,13 @@ before the network. Two ceilings from two sources, because the failure
 this guards against is a campaign record that is internally consistent
 and wrong.
 
-The operator entry point is `clojure -M:buy`, the only file in this
+The operator entry point is `kbb -M:buy`, the only file in this
 repository that opens a socket:
 
 ```bash
-clojure -M:buy --campaign campaign-10                      # dry run, no socket, no credential
-clojure -M:buy --campaign campaign-10 --live               # real account, campaign PAUSED, zero charge
-clojure -M:buy --campaign campaign-10 --live --spend --max-spend-jpy 50000   # ENABLED: this charges
+kbb -M:buy --campaign campaign-10                      # dry run, no socket, no credential
+kbb -M:buy --campaign campaign-10 --live               # real account, campaign PAUSED, zero charge
+kbb -M:buy --campaign campaign-10 --live --spend --max-spend-jpy 50000   # ENABLED: this charges
 ```
 
 Run the middle one first against any new account. It exercises the
@@ -329,15 +329,15 @@ other.
 ## Run
 
 ```bash
-clojure -M:dev:run       # walk both clean actuation lifecycles + every HARD-hold rule through the actor
-clojure -M:dev:test      # governor contract · phase invariants · store parity · registry conformance · facts + platform coverage · advisor boundary · drivers
-clojure -M:dev:coverage  # cloverage over src, driven by the same suite
-clojure -M:lint          # clj-kondo (errors fail; CI mirrors this)
+kbb -M:dev:run       # walk both clean actuation lifecycles + every HARD-hold rule through the actor
+kbb -M:dev:test      # governor contract · phase invariants · store parity · registry conformance · facts + platform coverage · advisor boundary · drivers
+kbb -M:dev:coverage  # cloverage over src, driven by the same suite
+kbb -M:lint          # clj-kondo (errors fail; CI mirrors this)
 ```
 
 134 tests / 881 assertions, 0 failures.
 
-Coverage: 97.72% forms / 98.87% lines, measured by `clojure -M:dev:coverage`
+Coverage: 97.72% forms / 98.87% lines, measured by `kbb -M:dev:coverage`
 with **nothing excluded** — not an estimate, and not a subset chosen to
 flatter the number. Every namespace, including both `-main` drivers, is
 at or above 96% on forms — the drivers included, because

@@ -102,13 +102,13 @@ only in production.
 ## Commands
 
 ```bash
-clojure -M:dev:test      # must be green before any commit
-clojure -M:lint          # errors fail CI
-clojure -M:dev:run       # both lifecycles + all eight HARD holds
-clojure -M:dev:coverage  # cloverage; the README figure comes from here
-clojure -M:dev:render-html   # regenerates docs/samples/operator-console.html
-clojure -M:buy --campaign <id>              # dry run: builds the buy requests, opens nothing
-clojure -M:buy --campaign <id> --live       # real account, campaign PAUSED, zero charge
+kbb -M:dev:test      # must be green before any commit
+kbb -M:lint          # errors fail CI
+kbb -M:dev:run       # both lifecycles + all eight HARD holds
+kbb -M:dev:coverage  # cloverage; the README figure comes from here
+kbb -M:dev:render-html   # regenerates docs/samples/operator-console.html
+kbb -M:buy --campaign <id>              # dry run: builds the buy requests, opens nothing
+kbb -M:buy --campaign <id> --live       # real account, campaign PAUSED, zero charge
 # --live --spend --max-spend-jpy N          # ENABLED: this charges the client
 ```
 
@@ -120,7 +120,7 @@ time- or order-dependent to the render path, that is the test that
 fails.
 
 Coverage is measured with nothing excluded, and the README quotes the
-number `clojure -M:dev:coverage` prints. If you lower it, say so rather
+number `kbb -M:dev:coverage` prints. If you lower it, say so rather
 than narrowing the measurement to hide it.
 
 ## Docs to update alongside code

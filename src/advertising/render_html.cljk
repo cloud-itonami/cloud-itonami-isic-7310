@@ -437,7 +437,7 @@
     (str/join "\n" (tieup-order-rows db))
     "</tbody></table>"
 
-    (str "<footer>Source: <code>src/advertising/render_html.cljk</code> via <code>clojure -M:dev:render-html</code>. "
+    (str "<footer>Source: <code>src/advertising/render_html.cljk</code> via <code>kbb -M:dev:render-html</code>. "
          "Nightly regeneration: <code>.github/workflows/regenerate.yml</code>.</footer>")
     "</body></html>"]))
 
