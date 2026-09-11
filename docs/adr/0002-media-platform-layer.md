@@ -118,7 +118,7 @@ actuation would read as evidence — the discipline
 An unknown platform does not cascade: `category-disposition` returns
 `:no-policy-basis` rather than `:prohibited`, and every other
 predicate returns an empty/false result, so exactly one rule
-(`no-platform-policy-basis`) fires. `test/advertising/platform_test.clj`
+(`no-platform-policy-basis`) fires. `test/advertising/platform_test.cljk`
 pins this — every predicate must decline to speak for a platform
 nobody transcribed, because a helper that answers `:permitted` for an
 unknown platform would route around the only check protecting it.
