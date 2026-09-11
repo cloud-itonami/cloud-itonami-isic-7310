@@ -147,7 +147,7 @@ op HARD-holds on its own finding), `tieup-evidence-incomplete`,
 `sponsorship-disclosure-missing`, plus the `already-ordered` guard.
 
 Test suite: 30 tests / 127 assertions → 58 tests / 322 assertions,
-0 failures; `clojure -M:lint` clean.
+0 failures; `kbb -M:lint` clean.
 
 ### Known R0 boundary
 

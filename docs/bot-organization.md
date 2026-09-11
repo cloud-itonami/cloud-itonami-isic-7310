@@ -18,7 +18,7 @@ This file is the operator-facing summary; the ADR wins on any conflict.
 
 1. **No bot actuates.** `:actuation/place-campaign` / `:actuation/order-creator-tieup`
    stay human-gated by phase structure; real spend is the owner's
-   `clojure -M:buy --live --spend` run.
+   `kbb -M:buy --live --spend` run.
 2. **Key separation.** B1's ingress key can only propose (`202 proposed`);
    it cannot approve. The Business Bot wallet signs launch messages only
    (`execution_authority: false` — measured).
