@@ -3,7 +3,7 @@
   regress on: NO real-world actuation op -- `:actuation/place-campaign`
   or `:actuation/order-creator-tieup` -- may EVER be a member of any
   phase's `:auto` set."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [clojure.set :as set]
             [advertising.phase :as phase]))
 

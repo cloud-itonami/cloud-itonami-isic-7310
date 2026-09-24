@@ -18,7 +18,7 @@
        `advertising.phase/gate` as a pure function; nothing asserted
        that the actor honours its answer. A phase-0 deployment that
        wrote to the SSoT would be a serious, silent bug."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [langgraph.graph :as g]
             [advertising.store :as store]
             [advertising.operation :as op]))

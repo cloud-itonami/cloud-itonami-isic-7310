@@ -16,7 +16,7 @@
 
   This is the one path in the actor that a live deployment exercises
   on every single request and the mock advisor never touches at all."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [advertising.advertisingadvisor :as advisor]
             [advertising.facts :as facts]
             [advertising.governor :as governor]
