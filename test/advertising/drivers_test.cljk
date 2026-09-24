@@ -13,7 +13,7 @@
   Nothing tied that narration to what the governor actually does, so a
   rule change could silently turn the demo into a lie while every other
   test stayed green. These tests tie them together."
-  (:require [kotoba.test :refer [deftest is testing]]
+  (:require [kotoba.io :as kio] [kotoba.test :refer [deftest is testing]]
             [kotoba.lang.text :as str]
             [advertising.sim :as sim]
             [advertising.render-html :as render]
@@ -70,7 +70,7 @@
         (is (false? (:tieup-ordered? c)) (str (:id c) " must not be ordered"))))))
 
 (deftest the-console-reports-the-real-store-not-a-fixture
-  (let [out (str (java.io.File. (System/getProperty "java.io.tmpdir")
+  (let [out (str (kio/file (System/getProperty "java.io.tmpdir")
                                 "advertising-console-test.html"))
         _ (render/-main out)
         html (slurp out)]
@@ -86,18 +86,18 @@
         (is (str/includes? html (name rule)) (str rule " must appear in the console"))))
     (testing "the page is self-describing about how it was produced"
       (is (str/includes? html "advertising.render-html")))
-    (.delete (java.io.File. out))))
+    (kio/delete (kio/file out))))
 
 (deftest the-console-is-byte-identical-across-reruns
   (testing "regenerate.yml commits this file nightly -- any nondeterminism (timestamp, map ordering, random id) becomes a spurious daily diff"
-    (let [fa (java.io.File. (System/getProperty "java.io.tmpdir") "advertising-console-a.html")
-          fb (java.io.File. (System/getProperty "java.io.tmpdir") "advertising-console-b.html")]
+    (let [fa (kio/file (System/getProperty "java.io.tmpdir") "advertising-console-a.html")
+          fb (kio/file (System/getProperty "java.io.tmpdir") "advertising-console-b.html")]
       (with-out-str (render/-main (str fa)))
       (with-out-str (render/-main (str fb)))
       (is (= (slurp fa) (slurp fb))
           "two independent runs of the real actor stack must produce identical bytes")
-      (.delete fa)
-      (.delete fb))))
+      (kio/delete fa)
+      (kio/delete fb))))
 
 (deftest the-sim-driver-runs-both-lifecycles-end-to-end
   (testing "the first thing a reader runs must not throw, and must narrate what actually happened"

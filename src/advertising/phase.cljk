@@ -32,7 +32,7 @@
   screening op has. Phase 3's `:auto` set here has only ONE member
   (`:campaign/intake`) -- this domain has no separate no-capital-risk
   'file' lifecycle distinct from the campaign record itself."
-  (:require [clojure.set :as set]))
+  (:require [kotoba.lang.coll :as set]))
 
 (def read-ops  #{})
 
