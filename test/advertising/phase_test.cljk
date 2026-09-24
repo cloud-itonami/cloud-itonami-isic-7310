@@ -4,7 +4,7 @@
   or `:actuation/order-creator-tieup` -- may EVER be a member of any
   phase's `:auto` set."
   (:require [kotoba.test :refer [deftest is testing]]
-            [clojure.set :as set]
+            [kotoba.lang.coll :as set]
             [advertising.phase :as phase]))
 
 (deftest place-campaign-never-auto-at-any-phase

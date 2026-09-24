@@ -100,7 +100,7 @@
   `:distinguishable-from-product-ui` as 'the generative-surface flag'
   would therefore be wrong, and would drop it from two platforms that
   publish it."
-  (:require [clojure.set :as set]))
+  (:require [kotoba.lang.coll :as set]))
 
 (def category-vocabulary
   "The shared, closed vocabulary a campaign's `:ad-category` is drawn
