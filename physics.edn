@@ -1,0 +1,43 @@
+;; What this vertical's robot physically does, declared for
+;; kotoba.robotics.process (kotoba-lang/robotics). `kbb -M:dev:physics` runs it.
+;;
+;; README "Robotics premise": a print / signage production robot handles
+;; physical ad-material production where used (ISIC 7310, advertising). Its
+;; physical work: carrying finished sign panels from the print floor to the
+;; installer's van, lifting a panel onto its wall brackets, and proof-testing
+;; the aluminium mounting strap the panel hangs from.
+;;
+;; Every number without a cited source is marked `estimate` in its :basis.
+;; Replacing an estimate with a sourced value is this bot's growth work.
+{:physics/schema "itonami.physical-ai.spec.v1"
+ :repo "cloud-itonami/cloud-itonami-isic-7310"
+ :cases
+ [{:id :sign-panels-to-van
+   :kind :transport
+   :procedure "production robot carries a rack of printed aluminium-composite sign panels from the print floor to the loading bay"
+   :params {:mass-kg 70.0 :distance-m 45.0 :v-max-mps 1.0 :a-max-mps2 0.5
+            :brake-decel-mps2 0.8 :drive-force-n 150.0 :crr 0.02
+            :cog-height-m 0.40 :payload-cog-height-m 0.90 :support-half-length-m 0.30
+            :max-time-s 1800.0}
+   :sweep {:param :payload-kg :values [10.0 30.0 60.0 100.0 160.0]}
+   :quantity :cycle-time-s
+   :limit {:max 60.0 :basis "estimate: one print-floor-to-bay leg inside the van's loading slot"}
+   :boundary {:lo 1.0 :hi 800.0}}
+  {:id :panel-onto-wall-brackets
+   :kind :manipulator
+   :procedure "arm lifts a sign panel from the rack and hooks it onto wall brackets at shoulder height"
+   :params {:l1-m 0.55 :l2-m 0.50 :m1-kg 5.0 :m2-kg 3.5
+            :from [0.60 0.00] :to [0.70 0.55] :duration-s 3.0 :steps 500}
+   :sweep {:param :payload-kg :values [1.0 3.0 5.0 8.0 12.0]}
+   :quantity :peak-tau1-nm
+   :limit {:max 110.0 :basis "estimate: continuous shoulder torque of a 12 kg-class collaborative arm"}
+   :boundary {:lo 0.2 :hi 30.0}}
+  {:id :mounting-strap-proof-test
+   :kind :material
+   :procedure "tensile proof test of a 25 x 3 mm aluminium mounting strap sample; its 0.2 % proof load must carry the panel's design hanging load with margin"
+   :params {:length-m 0.10 :area-m2 7.5e-5 :youngs-modulus-pa 69.0e9 :hardening-pa 0.5e9
+            :density-kg-m3 2700.0 :max-force-n 20000.0}
+   :sweep {:param :yield-stress-pa :values [80.0e6 110.0e6 150.0e6 180.0e6 215.0e6]}
+   :quantity :yield-force-n
+   :limit {:min 9000.0 :basis "estimate: design hanging load of a large panel incl. wind and a safety factor, per strap; alloy temper yield values in the sweep are typical ranges, not certified"}
+   :boundary {:lo 60.0e6 :hi 250.0e6}}]}

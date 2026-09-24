@@ -6,6 +6,10 @@
  ;; inside the monorepo checkout — a standalone fork should override them
  ;; with git coordinates.
  :deps {
+        ;; kotoba.robotics.process: the process-physics solvers and probe this
+        ;; repo's physics.edn runs on (physical-AI bot, scripts/physical-ai-bots).
+        io.github.kotoba-lang/robotics {:local/root "../../kotoba-lang/robotics"}
+
         ;; kotoba.lang.text, not clojure.string. Pinned as an explicit floor:
         ;; tools.deps takes the NEWEST sha it is shown, so without a floor here
         ;; this repo silently rides whatever a sibling happens to name.
@@ -23,7 +27,29 @@ io.github.com-junkawasaki/langgraph-clj
         {:git/url "https://github.com/kotoba-lang/langchain-store.git"
          :git/sha "69e99605e66d719cec4bfa11530119e170f551b3"}}
  :aliases
- {;; This alias held an :override-deps entry for the retired coordinate
+ {
+  ;; kbb -M:physics -> the physical-AI bot's measurement: runs physics.edn on
+  ;; kotoba.robotics.process and prints one probe map. Exit 2 = could not measure.
+  :physics {:main-opts ["-m" "kotoba.robotics.process.probe"]}
+  ;; kbb -M:physai-test -> test/'s .cljk on kbb's runner (the bot's test count;
+  ;; a .kotoba vertical's own :test may refuse kbb on purpose).
+  ;; test/'s namespaces minus these, which cannot load on kbb (the full suite stays on :test, fleet JVM gate):
+  ;; - advertising.buy-test: JVM-only by design (advertising.buy imports java.net.http.HttpClient)
+  ;; - advertising.drivers-test: JVM-only by design (drives advertising.render-html, whose
+  ;;   jp-go-dds.skin/dds+skin is #?(:clj)-only upstream: io/resource)
+  :physai-test {:extra-paths ["test" "test-physai"]
+                :main-opts ["-m" "cognitect.test-runner"
+                            "-n" "advertising.physics-spec-test"
+                            "-n" "advertising.advertisingadvisor-test"
+                            "-n" "advertising.facts-test"
+                            "-n" "advertising.governor-contract-test"
+                            "-n" "advertising.operation-test"
+                            "-n" "advertising.phase-test"
+                            "-n" "advertising.placer-test"
+                            "-n" "advertising.platform-test"
+                            "-n" "advertising.registry-test"
+                            "-n" "advertising.store-contract-test"]}
+;; This alias held an :override-deps entry for the retired coordinate
   ;; io.github.com-junkawasaki/langchain-clj. langgraph declares the same
   ;; library as io.github.kotoba-lang/langchain, so the entry matched no
   ;; node in the resolved tree and never reached the classpath -- verified
