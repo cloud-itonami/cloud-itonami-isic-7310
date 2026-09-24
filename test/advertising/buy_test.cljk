@@ -2,7 +2,7 @@
   "The refusals in the one command that can spend money, tested without a
   network and without a credential -- which is the point: every one of
   them is a decision made BEFORE anything could be opened or charged."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [advertising.buy :as buy]))
 
 (def ^:private full-env
