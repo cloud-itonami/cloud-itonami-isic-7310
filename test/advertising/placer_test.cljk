@@ -9,7 +9,7 @@
   failed send is `:sent? false` rather than an omission, and CHARGING a
   client is a second decision on top of going live, with its own
   operator-set ceiling checked in the last function before the network."
-  (:require [kotoba.lang.text :as str]
+  (:require [kotoba.lang.error :as kerror] [kotoba.lang.text :as str]
             [kotoba.test :refer [deftest is testing]]
             [langgraph.graph :as g]
             [advertising.placer :as placer]
@@ -95,26 +95,26 @@
 
 (deftest a-live-placer-that-cannot-send-refuses-to-exist
   (testing "no :http-fn -- throws at CONSTRUCTION rather than yielding something that behaves as a dry run"
-    (is (thrown? clojure.lang.ExceptionInfo (placer/live-placer {:credentials creds})))
-    (is (thrown? clojure.lang.ExceptionInfo (placer/live-placer {:http-fn "not-a-fn" :credentials creds}))))
+    (is (thrown? kerror/ExceptionInfo (placer/live-placer {:credentials creds})))
+    (is (thrown? kerror/ExceptionInfo (placer/live-placer {:http-fn "not-a-fn" :credentials creds}))))
   (testing "an INCOMPLETE credential set is refused too, for the same reason a partial map is never returned"
     (doseq [k [:developer-token :access-token :customer-id :login-customer-id]]
-      (is (thrown? clojure.lang.ExceptionInfo
+      (is (thrown? kerror/ExceptionInfo
                    (placer/live-placer {:http-fn identity :credentials (dissoc creds k)}))
           (str "missing " k " must fail at construction"))))
   (testing "a SPENDING placer with no ceiling of its own is refused -- the campaign's authorized budget is the governor's number, not the operator's"
-    (is (thrown? clojure.lang.ExceptionInfo
+    (is (thrown? kerror/ExceptionInfo
                  (placer/live-placer {:http-fn identity :credentials creds :spend? true})))
-    (is (thrown? clojure.lang.ExceptionInfo
+    (is (thrown? kerror/ExceptionInfo
                  (placer/live-placer {:http-fn identity :credentials creds :spend? true
                                       :max-spend-micros 0}))))
   (testing "the messages name what to fix"
     (try (placer/live-placer {:credentials creds})
          (is false "should have thrown")
-         (catch clojure.lang.ExceptionInfo e (is (re-find #"http-fn" (ex-message e)))))
+         (catch kerror/ExceptionInfo e (is (re-find #"http-fn" (ex-message e)))))
     (try (placer/live-placer {:http-fn identity :credentials (dissoc creds :customer-id)})
          (is false "should have thrown")
-         (catch clojure.lang.ExceptionInfo e (is (re-find #"customer-id" (ex-message e)))))))
+         (catch kerror/ExceptionInfo e (is (re-find #"customer-id" (ex-message e)))))))
 
 ;; ----------------------------- live, and spending -----------------------------
 
