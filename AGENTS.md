@@ -1,4 +1,4 @@
-# CLAUDE.md — working in cloud-itonami-isic-7310
+# AGENTS.md — working in cloud-itonami-isic-7310
 
 Guidance for agents editing this repo. The README explains what the
 business is; this file explains what will break if you edit carelessly.

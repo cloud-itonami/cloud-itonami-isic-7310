@@ -267,7 +267,7 @@
     ;;
     ;; NOTE the spend figures are demo values. A campaign record is not a budget
     ;; authorization: nothing here has been approved, and this actor cannot
-    ;; attach a payment method (CLAUDE.md safety floor 2).
+    ;; attach a payment method (AGENTS.md safety floor 2).
     ;;
     ;; clean: sold as what it is -- a generation service. :digital-products-
     ;; education is unnamed by ExoClick's guidelines, and ExoClick is an OPEN
